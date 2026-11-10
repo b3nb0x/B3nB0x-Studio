@@ -30,6 +30,8 @@ pub struct Config {
     pub memory: MemoryConfig,
     #[serde(default)]
     pub permissions: crate::permissions::PermissionConfig,
+    #[serde(default)]
+    pub mcp: std::collections::HashMap<String, crate::mcp::McpServerConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

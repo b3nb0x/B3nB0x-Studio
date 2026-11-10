@@ -1,3 +1,4 @@
+use b3nbox_core::mcp::McpRegistry;
 use b3nbox_core::memory::MemoryLayer;
 use b3nbox_core::permissions::Permissions;
 use b3nbox_core::pipeline::Pipeline;
@@ -12,6 +13,7 @@ pub struct AppState {
     pub pipeline: Arc<Pipeline>,
     pub memory: Option<Arc<MemoryLayer>>,
     pub permissions: Arc<Permissions>,
+    pub mcp: Arc<McpRegistry>,
     pub tasks: Arc<RwLock<HashMap<String, serde_json::Value>>>,
 }
 
@@ -20,12 +22,14 @@ impl AppState {
         router: Arc<Router>,
         memory: Option<Arc<MemoryLayer>>,
         permissions: Arc<Permissions>,
+        mcp: Arc<McpRegistry>,
     ) -> Self {
         Self {
             pipeline: Arc::new(Pipeline::new(router.clone(), memory.clone())),
             router,
             memory,
             permissions,
+            mcp,
             tasks: Arc::new(RwLock::new(HashMap::new())),
         }
     }

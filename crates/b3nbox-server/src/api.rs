@@ -25,6 +25,8 @@ pub fn routes() -> AxumRouter<AppState> {
         .route("/v1/memory/recent", get(recent_memory))
         .route("/v1/permissions", get(list_permissions).post(add_permission))
         .route("/v1/permissions/check", post(check_permission))
+        .route("/v1/mcp/tools", get(mcp_tools))
+        .route("/v1/mcp/call", post(mcp_call))
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -156,6 +158,30 @@ struct CheckBody {
 async fn check_permission(State(state): State<AppState>, Json(body): Json<CheckBody>) -> Json<serde_json::Value> {
     let result = state.permissions.check(&body.action, body.scope.as_deref());
     Json(serde_json::to_value(result).unwrap())
+}
+
+async fn mcp_tools(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let tools = state.mcp.list_tools();
+    Json(json!({ "servers": tools }))
+}
+
+#[derive(Deserialize)]
+struct McpCallBody {
+    server: String,
+    tool: String,
+    #[serde(default)]
+    arguments: serde_json::Value,
+}
+
+async fn mcp_call(State(state): State<AppState>, Json(body): Json<McpCallBody>) -> Json<serde_json::Value> {
+    let check = state.permissions.check("mcp_tool", Some(&format!("{}:{}", body.server, body.tool)));
+    if !check.allowed {
+        return Json(json!({ "error": "Verweigert durch Permission-System", "check": check }));
+    }
+    match state.mcp.call(&body.server, &body.tool, body.arguments) {
+        Ok(result) => Json(json!({ "status": "ok", "result": result })),
+        Err(e) => Json(json!({ "status": "error", "error": e.to_string() })),
+    }
 }
 
 async fn search_memory(

@@ -76,3 +76,13 @@ mode = "default-allow"
 # effect = "allow"
 # action = "script"
 # scope = "scripts"
+
+# --- MCP-Server (Model Context Protocol, JSON-RPC über stdio) ---
+
+# [mcp.filesystem]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-filesystem", "/pfad/zum/projekt"]
+#
+# [mcp.git]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-git"]

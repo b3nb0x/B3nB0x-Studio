@@ -49,6 +49,7 @@ async fn main() {
             pipeline: Default::default(),
             memory: Default::default(),
             permissions: Default::default(),
+            mcp: HashMap::new(),
         }
     });
 
@@ -69,8 +70,16 @@ async fn main() {
 
     let permissions = Arc::new(b3nbox_core::permissions::Permissions::new(&config.permissions));
 
+    let mcp = Arc::new(b3nbox_core::mcp::McpRegistry::new());
+    for (name, server_config) in &config.mcp {
+        match mcp.register(name, server_config) {
+            Ok(()) => tracing::info!("MCP-Server '{name}' gestartet"),
+            Err(e) => tracing::warn!("MCP-Server '{name}' Start fehlgeschlagen: {e}"),
+        }
+    }
+
     let router = Arc::new(CoreRouter::new(build_backends(&config), config.routing.clone()));
-    let app_state = AppState::new(router, memory, permissions);
+    let app_state = AppState::new(router, memory, permissions, mcp);
 
     let app = axum::Router::new()
         .merge(api::routes())
