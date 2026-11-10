@@ -38,6 +38,7 @@ pub fn routes() -> AxumRouter<AppState> {
         .route("/v1/sessions/{id}", get(get_session).delete(delete_session))
         .route("/v1/sessions/{id}/chat", post(session_chat))
         .route("/v1/audit", get(recent_audit))
+        .route("/v1/guard/blocked", get(guard_blocked))
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -225,6 +226,17 @@ async fn search_semantic(
         Ok(hits) => Json(json!({ "query": query, "results": hits })),
         Err(e) => Json(json!({ "error": e })),
     }
+}
+
+async fn guard_blocked(State(state): State<AppState>) -> Json<serde_json::Value> {
+    Json(json!({
+        "config": {
+            "enabled": state.guard.config().enabled,
+            "mode": if state.guard.config().mode == b3nbox_core::guard::GuardMode::Block { "block" } else { "log-only" },
+            "llm_check": state.guard.config().llm_check,
+        },
+        "blocked": state.guard.blocked_attempts(),
+    }))
 }
 
 async fn recent_audit(

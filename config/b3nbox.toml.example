@@ -113,3 +113,12 @@ db_path = "data/b3nbox-sessions.db"
 [audit]
 enabled = true
 db_path = "data/b3nbox-audit.db"
+
+# --- Injection-Guard ---
+# mode: "block" (Injektionen werden blockiert) | "log-only" (nur loggen)
+# llm_check: zusaetzlicher LLM-Klassifikator bei Verdacht (Phase 5)
+
+[guard]
+enabled = true
+mode = "block"
+llm_check = false

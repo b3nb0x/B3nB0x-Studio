@@ -53,6 +53,7 @@ async fn main() {
             scripts: Default::default(),
             sessions: Default::default(),
             audit: Default::default(),
+            guard: Default::default(),
         }
     });
 
@@ -121,7 +122,24 @@ async fn main() {
         core_router = core_router.with_audit(audit.clone());
     }
     let router = Arc::new(core_router);
-    let app_state = AppState::new(router, memory, permissions, mcp, scripts, sessions, audit);
+    let guard = Arc::new(b3nbox_core::guard::Guard::new(config.guard.clone()));
+    tracing::info!(
+        "Injection-Guard aktiv (Modus: {})",
+        if config.guard.mode == b3nbox_core::guard::GuardMode::Block { "block" } else { "log-only" }
+    );
+
+    let app_state = AppState::new(
+        router,
+        state::Components {
+            memory,
+            permissions,
+            mcp,
+            scripts,
+            sessions,
+            audit,
+            guard,
+        },
+    );
 
     let scheduler_state = app_state.clone();
     tokio::spawn(async move {
