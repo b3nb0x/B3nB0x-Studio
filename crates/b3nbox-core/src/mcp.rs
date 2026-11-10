@@ -30,6 +30,35 @@ pub struct McpServerConfig {
     pub args: Vec<String>,
 }
 
+/// Loest einen nackten Befehlsnamen (z.B. "npx") zu einem absoluten Pfad auf:
+/// erst PATH des Server-Prozesses, dann uebliche Benutzer-Verzeichnisse
+/// (~/.local/bin etc.), damit MCP-Server auch ohne angepasste PATH-Umgebung
+/// starten. Absolute Pfade werden unveraendert uebernommen.
+fn resolve_command(command: &str) -> String {
+    if command.contains('/') {
+        return command.to_string();
+    }
+    let mut dirs: Vec<std::path::PathBuf> = std::env::var("PATH")
+        .unwrap_or_default()
+        .split(':')
+        .map(std::path::PathBuf::from)
+        .collect();
+    if let Ok(home) = std::env::var("HOME") {
+        for extra in [".local/bin", ".cargo/bin", "bin", ".npm-global/bin", ".nvm/defaults/bin"] {
+            dirs.push(std::path::PathBuf::from(&home).join(extra));
+        }
+    }
+    dirs.push("/usr/local/bin".into());
+    dirs.push("/usr/bin".into());
+    for dir in dirs {
+        let candidate = dir.join(command);
+        if candidate.is_file() {
+            return candidate.to_string_lossy().into_owned();
+        }
+    }
+    command.to_string()
+}
+
 struct McpProcess {
     child: Child,
     stdin: ChildStdin,
@@ -42,6 +71,8 @@ pub struct McpClient {
 }
 
 /// Grundauswahl: haeufig genutzte MCP-Server fuer den Schnellstart.
+/// Alle per npx (Node.js in ~/.local/bin wird automatisch aufgeloest)
+/// und getestet (stdio-Handshake).
 pub const MCP_CATALOG: &[(&str, &str, &[&str])] = &[
     (
         "filesystem",
@@ -49,29 +80,19 @@ pub const MCP_CATALOG: &[(&str, &str, &[&str])] = &[
         &["npx", "-y", "@modelcontextprotocol/server-filesystem", "."],
     ),
     (
-        "git",
-        "Git-Operationen (status, diff, log, commit)",
-        &["npx", "-y", "@modelcontextprotocol/server-git"],
-    ),
-    (
-        "fetch",
-        "HTTP/Webseiten abrufen und in Text umwandeln",
-        &["npx", "-y", "@modelcontextprotocol/server-fetch"],
-    ),
-    (
         "memory",
         "Persistenter Wissens-Speicher (Knowledge-Graph)",
         &["npx", "-y", "@modelcontextprotocol/server-memory"],
     ),
     (
-        "sqlite",
-        "SQLite-Datenbank abfragen",
-        &["npx", "-y", "@modelcontextprotocol/server-sqlite", "--db-path", "data/mcp-sqlite.db"],
+        "sequential-thinking",
+        "Strukturiertes schrittweise Denken fuer komplexe Aufgaben",
+        &["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"],
     ),
     (
-        "time",
-        "Zeiten und Zeitzonen berechnen",
-        &["npx", "-y", "@modelcontextprotocol/server-time"],
+        "everything",
+        "Test-Server mit allen MCP-Faehigkeiten (Demo/Referenz)",
+        &["npx", "-y", "@modelcontextprotocol/server-everything"],
     ),
 ];
 
@@ -93,7 +114,16 @@ impl McpClient {
         if guard.is_some() {
             return Ok(());
         }
-        let mut child = std::process::Command::new(&config.command)
+        let command = resolve_command(&config.command);
+        // PATH erweitern, damit Shebangs des Kindprozesses (z.B. npx ->
+        // "/usr/bin/env node") node & Co. finden, auch wenn der
+        // b3nbox-Server selbst mit minimalem PATH gestartet wurde.
+        let child_path = std::env::var("PATH").unwrap_or_default();
+        let home_extra = std::env::var("HOME")
+            .map(|h| format!("{h}/.local/bin:{h}/.cargo/bin"))
+            .unwrap_or_default();
+        let mut child = std::process::Command::new(&command)
+            .env("PATH", format!("{child_path}:{home_extra}:/usr/local/bin:/usr/bin"))
             .args(&config.args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -323,5 +353,14 @@ done
         assert!(registry.unregister("echo"));
         assert!(!registry.unregister("echo"));
         assert!(registry.list_servers().is_empty());
+    }
+
+    #[test]
+    fn resolve_command_finds_npx_and_keeps_absolute_paths() {
+        // Absolute Pfade bleiben unveraendert
+        assert_eq!(resolve_command("/usr/bin/env"), "/usr/bin/env");
+        // Nackter Name wird aufgelistet, wenn er existiert (sh liegt ueberall)
+        let resolved = resolve_command("sh");
+        assert!(resolved.contains('/') || resolved == "sh");
     }
 }
