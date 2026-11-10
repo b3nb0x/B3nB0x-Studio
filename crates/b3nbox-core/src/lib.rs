@@ -4,6 +4,7 @@ pub mod audit;
 pub mod backend;
 pub mod config;
 pub mod embeddings;
+pub mod guard;
 pub mod mcp;
 pub mod memory;
 #[cfg(feature = "native-inference")]
