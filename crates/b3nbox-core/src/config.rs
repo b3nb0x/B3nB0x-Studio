@@ -34,6 +34,33 @@ pub struct Config {
     pub mcp: std::collections::HashMap<String, crate::mcp::McpServerConfig>,
     #[serde(default)]
     pub scripts: ScriptsConfig,
+    #[serde(default)]
+    pub sessions: SessionsConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionsConfig {
+    #[serde(default = "default_sessions_db")]
+    pub db_path: String,
+    #[serde(default = "default_sessions_enabled")]
+    pub enabled: bool,
+}
+
+impl Default for SessionsConfig {
+    fn default() -> Self {
+        Self {
+            db_path: default_sessions_db(),
+            enabled: default_sessions_enabled(),
+        }
+    }
+}
+
+fn default_sessions_db() -> String {
+    "data/b3nbox-sessions.db".into()
+}
+
+fn default_sessions_enabled() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -34,6 +34,9 @@ pub fn routes() -> AxumRouter<AppState> {
         .route("/v1/scripts/{name}/run", post(run_script))
         .route("/v1/schedule", get(list_schedule).post(add_schedule).delete(remove_schedule))
         .route("/v1/schedule/tick", post(tick_scheduler))
+        .route("/v1/sessions", get(list_sessions).post(create_session))
+        .route("/v1/sessions/{id}", get(get_session).delete(delete_session))
+        .route("/v1/sessions/{id}/chat", post(session_chat))
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -220,6 +223,113 @@ async fn search_semantic(
     match memory.search_similar(&query_vec, limit) {
         Ok(hits) => Json(json!({ "query": query, "results": hits })),
         Err(e) => Json(json!({ "error": e })),
+    }
+}
+
+async fn list_sessions(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let Some(sessions) = &state.sessions else {
+        return Json(json!({ "error": "Session-Store nicht aktiviert" }));
+    };
+    match sessions.list_sessions() {
+        Ok(list) => Json(json!({ "sessions": list })),
+        Err(e) => Json(json!({ "error": e })),
+    }
+}
+
+#[derive(Deserialize)]
+struct CreateSessionBody {
+    name: String,
+}
+
+async fn create_session(State(state): State<AppState>, Json(body): Json<CreateSessionBody>) -> Json<serde_json::Value> {
+    let Some(sessions) = &state.sessions else {
+        return Json(json!({ "error": "Session-Store nicht aktiviert" }));
+    };
+    match sessions.create_session(&body.name) {
+        Ok(session) => Json(serde_json::to_value(session).unwrap()),
+        Err(e) => Json(json!({ "error": e })),
+    }
+}
+
+async fn get_session(State(state): State<AppState>, Path(id): Path<String>) -> Json<serde_json::Value> {
+    let Some(sessions) = &state.sessions else {
+        return Json(json!({ "error": "Session-Store nicht aktiviert" }));
+    };
+    match sessions.history(&id) {
+        Ok(history) => Json(json!({ "id": id, "messages": history })),
+        Err(e) => Json(json!({ "error": e })),
+    }
+}
+
+async fn delete_session(State(state): State<AppState>, Path(id): Path<String>) -> Json<serde_json::Value> {
+    let Some(sessions) = &state.sessions else {
+        return Json(json!({ "error": "Session-Store nicht aktiviert" }));
+    };
+    match sessions.delete_session(&id) {
+        Ok(deleted) => Json(json!({ "status": if deleted { "deleted" } else { "not-found" } })),
+        Err(e) => Json(json!({ "error": e })),
+    }
+}
+
+#[derive(Deserialize)]
+struct SessionChatBody {
+    message: String,
+    #[serde(default)]
+    route: Option<String>,
+    #[serde(default)]
+    temperature: Option<f32>,
+    #[serde(default)]
+    max_tokens: Option<u32>,
+}
+
+async fn session_chat(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<SessionChatBody>,
+) -> Json<serde_json::Value> {
+    let Some(sessions) = &state.sessions else {
+        return Json(json!({ "error": "Session-Store nicht aktiviert" }));
+    };
+    let check = state.permissions.check("chat", body.route.as_deref());
+    if !check.allowed {
+        return Json(json!({ "error": "Verweigert durch Permission-System", "check": check }));
+    }
+
+    let history = match sessions.history(&id) {
+        Ok(h) => h,
+        Err(e) => return Json(json!({ "error": e })),
+    };
+    let mut messages: Vec<b3nbox_core::types::ChatMessage> = history
+        .into_iter()
+        .map(|m| b3nbox_core::types::ChatMessage {
+            role: m.role,
+            content: m.content,
+        })
+        .collect();
+    messages.push(b3nbox_core::types::ChatMessage {
+        role: "user".into(),
+        content: body.message.clone(),
+    });
+
+    let route = body.route.unwrap_or_else(|| "default".into());
+    let request = b3nbox_core::types::ChatRequest {
+        model: None,
+        messages,
+        temperature: body.temperature,
+        max_tokens: body.max_tokens,
+    };
+    match state.router.chat(&request, &route).await {
+        Ok(resp) => {
+            let _ = sessions.add_message(&id, "user", &body.message);
+            let _ = sessions.add_message(&id, "assistant", &resp.content);
+            Json(json!({
+                "backend": resp.backend,
+                "model": resp.model,
+                "content": resp.content,
+                "duration_ms": resp.duration_ms,
+            }))
+        }
+        Err(e) => Json(json!({ "error": e.to_string() })),
     }
 }
 

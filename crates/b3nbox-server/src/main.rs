@@ -51,6 +51,7 @@ async fn main() {
             permissions: Default::default(),
             mcp: HashMap::new(),
             scripts: Default::default(),
+            sessions: Default::default(),
         }
     });
 
@@ -84,8 +85,23 @@ async fn main() {
         config.scripts.require_approval,
     ));
 
+    let sessions = if config.sessions.enabled {
+        match b3nbox_core::sessions::SessionStore::open(&config.sessions.db_path) {
+            Ok(store) => {
+                tracing::info!("Session-Store aktiv: {}", config.sessions.db_path);
+                Some(Arc::new(store))
+            }
+            Err(e) => {
+                tracing::warn!("Session-Store deaktiviert ({e})");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     let router = Arc::new(CoreRouter::new(build_backends(&config), config.routing.clone()));
-    let app_state = AppState::new(router, memory, permissions, mcp, scripts);
+    let app_state = AppState::new(router, memory, permissions, mcp, scripts, sessions);
 
     let scheduler_state = app_state.clone();
     tokio::spawn(async move {
