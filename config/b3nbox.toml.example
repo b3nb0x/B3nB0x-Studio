@@ -2,8 +2,18 @@
 # Kopiere diese Datei nach config/b3nbox.toml und passe sie an.
 
 [server]
-host = "127.0.0.1"
+host = "127.0.0.1"   # fuer Netzwerkzugriff: "0.0.0.0"
 port = 8300
+
+# --- HTTPS ---
+# https = true: TLS aktiv
+#   - Ohne cert_path/key_path: Self-Signed-Zertifikat wird automatisch
+#     generiert (data/certs/) - ideal fuer lokale Nutzung
+#   - Mit Domaeene (Let's Encrypt): certbot certonly -d deine.domaene.de
+#     und Pfade auf /etc/letsencrypt/live/<domain>/ setzen
+# https = false
+# cert_path = "/etc/letsencrypt/live/deine.domaene.de/fullchain.pem"
+# key_path = "/etc/letsencrypt/live/deine.domaene.de/privkey.pem"
 
 # --- LLM Backends (Adapter) ---
 # type: ollama | llamacpp | lmstudio | native

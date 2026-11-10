@@ -9,6 +9,7 @@ use tracing_subscriber::EnvFilter;
 
 mod api;
 mod state;
+mod tls;
 
 use state::AppState;
 
@@ -32,6 +33,7 @@ fn build_backends(config: &Config) -> HashMap<String, Arc<dyn LlmBackend>> {
 
 #[tokio::main]
 async fn main() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .init();
@@ -61,6 +63,9 @@ async fn main() {
             server: b3nbox_core::config::ServerConfig {
                 host: "127.0.0.1".into(),
                 port: 8300,
+                https: false,
+                cert_path: None,
+                key_path: None,
             },
             backends: HashMap::new(),
             routing: HashMap::new(),
@@ -197,7 +202,30 @@ async fn main() {
         .route("/", get(|| async { axum::Json(serde_json::json!({ "service": "B3nBox Studio LLM Manager", "docs": "/v1/models, /v1/chat, /v1/routing, /v1/pipeline, /v1/tasks" })) }));
 
     let addr = format!("{}:{}", config.server.host, config.server.port);
-    tracing::info!("B3nBox LLM Manager startet auf http://{addr}");
-    let listener = tokio::net::TcpListener::bind(&addr).await.expect("Port-Bindung fehlgeschlagen");
-    axum::serve(listener, app).await.unwrap();
+    if config.server.https {
+        match tls::load_or_generate_tls(
+            config.server.cert_path.as_deref(),
+            config.server.key_path.as_deref(),
+        )
+        .await
+        {
+            Ok(tls_config) => {
+                tracing::info!("B3nBox LLM Manager startet auf https://{addr}");
+                let handle = axum_server::Handle::new();
+                axum_server::bind_rustls(addr.parse().expect("Adresse ungültig"), tls_config)
+                    .handle(handle)
+                    .serve(app.into_make_service())
+                    .await
+                    .unwrap();
+            }
+            Err(e) => {
+                tracing::error!("HTTPS-Start fehlgeschlagen: {e}");
+            }
+        }
+    } else {
+        tracing::warn!("HTTP-Modus (unverschlüsselt) - für Netzwerkzugriff https = true empfehlen");
+        tracing::info!("B3nBox LLM Manager startet auf http://{addr}");
+        let listener = tokio::net::TcpListener::bind(&addr).await.expect("Port-Bindung fehlgeschlagen");
+        axum::serve(listener, app).await.unwrap();
+    }
 }
