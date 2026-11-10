@@ -50,8 +50,8 @@ export default function RateLimit() {
       {status && (
         <div
           style={{
-            background: status.enabled ? "#f0fdf4" : "#fef3c7",
-            border: `1px solid ${status.enabled ? "#bbf7d0" : "#f59e0b"}`,
+            background: status.enabled ? "#052e16" : "#422006",
+            border: `1px solid ${status.enabled ? "#16a34a" : "#f59e0b"}`,
             borderRadius: 6,
             padding: 12,
             marginBottom: "1rem",
@@ -61,7 +61,7 @@ export default function RateLimit() {
           {status.enabled ? (
             <span style={{ color: "green" }}>aktiv</span>
           ) : (
-            <span style={{ color: "#b45309" }}>deaktiviert</span>
+            <span style={{ color: "#fbbf24" }}>deaktiviert</span>
           )}{" "}
           — {status.requests_per_minute} Requests/min · {status.llm_requests_per_minute} LLM-Requests/min
         </div>

@@ -62,7 +62,7 @@ export default function Agent() {
             ({run.iterations_used} Iterationen)
           </h3>
           {run.answer && (
-            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: 12, borderRadius: 6 }}>
+            <div style={{ background: "#052e16", border: "1px solid #16a34a", padding: 12, borderRadius: 6 }}>
               <strong>Antwort:</strong>
               <p style={{ whiteSpace: "pre-wrap", margin: "8px 0 0" }}>{run.answer}</p>
             </div>
@@ -73,7 +73,7 @@ export default function Agent() {
               <li key={i}>
                 {s.tool ? (
                   <>
-                    <code>{s.tool}</code> → <span style={{ color: "#666" }}>{s.tool_result?.slice(0, 120)}</span>
+                    <code>{s.tool}</code> → <span style={{ color: "#94a3b8" }}>{s.tool_result?.slice(0, 120)}</span>
                   </>
                 ) : (
                   s.thought

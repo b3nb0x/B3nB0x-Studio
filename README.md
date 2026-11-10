@@ -2,9 +2,26 @@
   <img src="docs/banner.jpg" alt="B3nB0x Studio LLM Manager" width="640">
 </p>
 
-# B3nBox Studio
+<h1 align="center">B3nBox Studio</h1>
 
-Agent mit eingebautem **LLM Manager** — Rust-Kern, Python-SDK und Web-GUI.
+<p align="center">
+  <strong>Agent mit eingebautem LLM Manager</strong> — Rust-Kern, Python-SDK und Web-GUI
+</p>
+
+<p align="center">
+  <a href="https://github.com/b3nb0x/B3nB0x-Studio/releases"><img src="https://img.shields.io/badge/release-v0.1.0-8b5cf6?style=flat-square&logo=github" alt="Release v0.1.0"></a>
+  <a href="https://github.com/b3nb0x/B3nB0x-Studio/actions"><img src="https://img.shields.io/badge/tests-49%2F49-22c55e?style=flat-square&logo=githubactions" alt="Tests 49/49"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-f97316?style=flat-square" alt="License Apache-2.0"></a>
+  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-1.75%2B-3b82f6?style=flat-square&logo=rust&logoColor=white" alt="Rust"></a>
+  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/tools-MCP-a855f7?style=flat-square" alt="MCP"></a>
+</p>
+
+<p align="center">
+  <a href="#installation">Installation</a> ·
+  <a href="#schnellstart">Schnellstart</a> ·
+  <a href="#architektur">Architektur</a> ·
+  <a href="#prompt-injection-schutz">Sicherheit</a>
+</p>
 
 ## Architektur
 
@@ -43,6 +60,7 @@ Agent mit eingebautem **LLM Manager** — Rust-Kern, Python-SDK und Web-GUI.
 
 | Komponente | Pfad | Beschreibung |
 |---|---|---|
+| 🤖 Agent-Loop | `crates/b3nbox-core/src/agent.rs` | Autonome Tool-Use-Loops (MCP-Tools + Express-Tasks) |
 | LLM Manager Core | `crates/b3nbox-core` | Backend-Adapter, Routing-Engine, REA/ECC-Pipeline |
 | LLM Manager Server | `crates/b3nbox-server` | REST-API (axum), lauscht auf `127.0.0.1:8300` |
 | Python SDK | `python/` | Agent-Logik, Express-Tasks, Pipeline-Steuerung |

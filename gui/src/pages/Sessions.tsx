@@ -78,7 +78,7 @@ export default function Sessions() {
                   onClick={() => openSession(s.id)}
                   style={{
                     cursor: "pointer",
-                    background: activeId === s.id ? "#4f46e5" : "#f5f5f5",
+                    background: activeId === s.id ? "#8b5cf6" : "#0f172a",
                     color: activeId === s.id ? "#fff" : "#000",
                     border: "1px solid #ccc",
                     borderRadius: 6,
@@ -110,10 +110,10 @@ export default function Sessions() {
                   overflowY: "auto",
                 }}
               >
-                {messages.length === 0 && <p style={{ color: "#888" }}>Noch keine Nachrichten.</p>}
+                {messages.length === 0 && <p style={{ color: "#94a3b8" }}>Noch keine Nachrichten.</p>}
                 {messages.map((m, i) => (
                   <div key={i} style={{ marginBottom: 8 }}>
-                    <strong style={{ color: m.role === "assistant" ? "#4f46e5" : m.role === "error" ? "crimson" : "#333" }}>
+                    <strong style={{ color: m.role === "assistant" ? "#8b5cf6" : m.role === "error" ? "crimson" : "#333" }}>
                       {m.role}:
                     </strong>{" "}
                     <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>

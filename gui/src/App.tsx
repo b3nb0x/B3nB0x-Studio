@@ -51,8 +51,8 @@ export default function App() {
   ];
 
   return (
-    <div style={{ fontFamily: "system-ui, sans-serif", margin: 0, padding: "1rem 2rem" }}>
-      <header style={{ display: "flex", alignItems: "center", gap: "2rem", borderBottom: "1px solid #333" }}>
+    <div style={{ fontFamily: "system-ui, sans-serif", margin: 0, padding: "1rem 2rem", minHeight: "100vh", background: "#0b1220", color: "#e2e8f0" }}>
+      <header style={{ display: "flex", alignItems: "center", gap: "2rem", borderBottom: "1px solid #1e293b" }}>
         <h1 style={{ fontSize: "1.2rem" }}>B3nBox Studio</h1>
         <nav style={{ display: "flex", gap: "1rem" }}>
           {nav.map((n) => (
@@ -62,8 +62,8 @@ export default function App() {
               style={{
                 padding: "0.4rem 0.8rem",
                 cursor: "pointer",
-                background: page === n.key ? "#4f46e5" : "transparent",
-                color: page === n.key ? "#fff" : "#4f46e5",
+                background: page === n.key ? "#8b5cf6" : "transparent",
+                color: page === n.key ? "#fff" : "#8b5cf6",
                 border: "1px solid #4f46e5",
                 borderRadius: 6,
               }}

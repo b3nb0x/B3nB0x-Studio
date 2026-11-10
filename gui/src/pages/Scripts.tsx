@@ -120,7 +120,7 @@ export default function Scripts() {
       {result && (
         <details>
           <summary>Letztes Ergebnis</summary>
-          <pre style={{ whiteSpace: "pre-wrap", background: "#f5f5f5", padding: 8 }}>{result}</pre>
+          <pre style={{ whiteSpace: "pre-wrap", background: "#0f172a", padding: 8 }}>{result}</pre>
         </details>
       )}
     </section>

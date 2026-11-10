@@ -69,7 +69,7 @@ export default function Permissions() {
         <button onClick={check}>Aktion prüfen</button>
       </div>
       {checkResult && (
-        <pre style={{ background: "#f5f5f5", padding: 8 }}>{checkResult}</pre>
+        <pre style={{ background: "#0f172a", padding: 8 }}>{checkResult}</pre>
       )}
     </section>
   );

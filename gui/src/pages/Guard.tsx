@@ -33,7 +33,7 @@ export default function Guard() {
       {config && (
         <div
           style={{
-            background: "#fef3c7",
+            background: "#422006",
             border: "1px solid #f59e0b",
             borderRadius: 6,
             padding: 12,
@@ -50,7 +50,7 @@ export default function Guard() {
           {config.llm_check ? (
             <span style={{ color: "green" }}>an (Zweitmeinung bei Verdacht)</span>
           ) : (
-            <span style={{ color: "#888" }}>aus</span>
+            <span style={{ color: "#94a3b8" }}>aus</span>
           )}
         </div>
       )}
@@ -74,7 +74,7 @@ export default function Guard() {
               </td>
               <td>{b.reason}</td>
               <td>
-                <span style={{ fontFamily: "monospace", fontSize: 12, color: "#666" }}>
+                <span style={{ fontFamily: "monospace", fontSize: 12, color: "#94a3b8" }}>
                   {b.excerpt.length > 60 ? `${b.excerpt.slice(0, 60)}…` : b.excerpt}
                 </span>
               </td>
@@ -83,7 +83,7 @@ export default function Guard() {
         </tbody>
       </table>
       {blocked.length === 0 && (
-        <p style={{ color: "#888" }}>Keine geblockten Versuche — entweder ruhiges System oder Guard im log-only-Modus.</p>
+        <p style={{ color: "#94a3b8" }}>Keine geblockten Versuche — entweder ruhiges System oder Guard im log-only-Modus.</p>
       )}
     </section>
   );

@@ -74,7 +74,7 @@ export default function Pipeline() {
               <summary>
                 <strong>{r.phase}</strong> — {r.backend} / {r.model} ({r.duration_ms} ms)
               </summary>
-              <pre style={{ whiteSpace: "pre-wrap", background: "#f5f5f5", padding: 8 }}>{r.output}</pre>
+              <pre style={{ whiteSpace: "pre-wrap", background: "#0f172a", padding: 8 }}>{r.output}</pre>
             </details>
           ))}
         </div>

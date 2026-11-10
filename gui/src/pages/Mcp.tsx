@@ -65,7 +65,7 @@ export default function Mcp() {
             <input style={{ flex: 1 }} value={args} onChange={(e) => setArgs(e.target.value)} />
             <button onClick={call}>Aufrufen</button>
           </div>
-          {result && <pre style={{ background: "#f5f5f5", padding: 8 }}>{result}</pre>}
+          {result && <pre style={{ background: "#0f172a", padding: 8 }}>{result}</pre>}
         </>
       )}
     </section>

@@ -46,8 +46,8 @@ export default function Login() {
       {me ? (
         <div
           style={{
-            background: "#f0fdf4",
-            border: "1px solid #bbf7d0",
+            background: "#052e16",
+            border: "1px solid #16a34a",
             borderRadius: 6,
             padding: 12,
           }}
@@ -77,7 +77,7 @@ export default function Login() {
           </div>
           {error && <p style={{ color: "crimson" }}>{error}</p>}
           {authEnabled === false && (
-            <p style={{ color: "#888" }}>Server nicht erreichbar.</p>
+            <p style={{ color: "#94a3b8" }}>Server nicht erreichbar.</p>
           )}
         </div>
       )}
