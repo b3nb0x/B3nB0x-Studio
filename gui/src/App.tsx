@@ -12,6 +12,7 @@ import Sessions from "./pages/Sessions";
 import Audit from "./pages/Audit";
 import Guard from "./pages/Guard";
 import Login from "./pages/Login";
+import RateLimit from "./pages/RateLimit";
 
 type Page =
   | "dashboard"
@@ -26,7 +27,8 @@ type Page =
   | "sessions"
   | "audit"
   | "guard"
-  | "login";
+  | "login"
+  | "ratelimit";
 
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard");
@@ -45,6 +47,7 @@ export default function App() {
     { key: "audit", label: "Audit" },
     { key: "guard", label: "Guard" },
     { key: "login", label: "Login" },
+    { key: "ratelimit", label: "Rate-Limit" },
   ];
 
   return (
@@ -84,6 +87,7 @@ export default function App() {
         {page === "audit" && <Audit />}
         {page === "guard" && <Guard />}
         {page === "login" && <Login />}
+        {page === "ratelimit" && <RateLimit />}
       </main>
     </div>
   );

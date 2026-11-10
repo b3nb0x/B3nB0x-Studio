@@ -76,6 +76,15 @@ export const api = {
     req(`/v1/sessions/${id}/chat`, { method: "POST", body: JSON.stringify({ message }) }),
   recentAudit: (limit: number) => req(`/v1/audit?limit=${limit}`),
   guardBlocked: () => req("/v1/guard/blocked"),
+  rateLimit: () => req("/v1/rate-limit"),
+  updateRateLimit: (requestsPerMinute: number, llmRequestsPerMinute: number) =>
+    req("/v1/rate-limit", {
+      method: "POST",
+      body: JSON.stringify({
+        requests_per_minute: requestsPerMinute,
+        llm_requests_per_minute: llmRequestsPerMinute,
+      }),
+    }),
   login: (key: string) =>
     req("/v1/auth/login", { method: "POST", body: JSON.stringify({ key }) }),
   logout: () => req("/v1/auth/logout", { method: "POST", body: "{}" }),
