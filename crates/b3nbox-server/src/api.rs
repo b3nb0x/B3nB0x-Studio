@@ -14,6 +14,7 @@ pub fn routes() -> AxumRouter<AppState> {
         .route("/health", get(health))
         .route("/v1/models", get(list_models))
         .route("/v1/chat", post(chat))
+        .route("/v1/chat/stream", post(chat_stream))
         .route("/v1/routing", get(get_routing))
         .route("/v1/routing/{key}", put(set_routing))
         .route("/v1/pipeline/runs", post(start_run).get(list_runs))
@@ -74,6 +75,57 @@ async fn chat(
         Ok(resp) => Ok(Json(serde_json::to_value(resp).unwrap())),
         Err(e) => Err((StatusCode::BAD_GATEWAY, Json(json!({ "error": e.to_string() })))),
     }
+}
+
+async fn chat_stream(
+    State(state): State<AppState>,
+    Json(body): Json<ChatBody>,
+) -> Result<axum::response::sse::Sse<futures_util::stream::BoxStream<'static, Result<axum::response::sse::Event, std::convert::Infallible>>>, (StatusCode, Json<serde_json::Value>)> {
+    use axum::response::sse::{Event, Sse};
+    use futures_util::StreamExt;
+
+    let route = body.route.clone().unwrap_or_else(|| "default".into());
+    let check = state.permissions.check("chat", Some(&route));
+    if !check.allowed {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "Verweigert durch Permission-System" })),
+        ));
+    }
+
+    let Some(target) = state.router.route_for(&route).await else {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": format!("Keine Route '{route}' konfiguriert") })),
+        ));
+    };
+    let Some(backend) = state.router.backend(&target.backend) else {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": format!("Backend '{}' nicht gefunden", target.backend) })),
+        ));
+    };
+
+    let stream = match backend.chat_stream(&body.request, &target.model).await {
+        Ok(s) => s,
+        Err(e) => {
+            return Err((
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "error": e.to_string() })),
+            ))
+        }
+    };
+
+    let sse_stream = stream
+        .map(|chunk| {
+            Ok(match chunk {
+                Ok(text) => Event::default().data(text),
+                Err(e) => Event::default().event("error").data(e.to_string()),
+            })
+        })
+        .boxed();
+
+    Ok(Sse::new(sse_stream))
 }
 
 async fn get_routing(State(state): State<AppState>) -> Json<serde_json::Value> {

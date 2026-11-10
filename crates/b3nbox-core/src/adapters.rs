@@ -21,8 +21,13 @@ impl OpenAiCompatible {
     }
 
     fn chat_body(request: &ChatRequest, model: &str) -> Value {
+        Self::chat_body_stream(request, model, false)
+    }
+
+    fn chat_body_stream(request: &ChatRequest, model: &str, stream: bool) -> Value {
         let mut body = json!({
             "model": model,
+            "stream": stream,
             "messages": request.messages.iter().map(|m| json!({"role": m.role, "content": m.content})).collect::<Vec<_>>(),
         });
         if let Some(t) = request.temperature {
@@ -32,6 +37,34 @@ impl OpenAiCompatible {
             body["max_tokens"] = json!(mt);
         }
         body
+    }
+
+    async fn chat_stream_openai(
+        &self,
+        request: &ChatRequest,
+        model: &str,
+    ) -> Result<crate::backend::LlmStream, BackendError> {
+        let resp = self
+            .client
+            .post(format!("{}/v1/chat/completions", self.base_url))
+            .json(&Self::chat_body_stream(request, model, true))
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(BackendError::Api(self.name.clone(), format!("{status}: {body}")));
+        }
+        let byte_stream = resp.bytes_stream();
+        let chunk_stream = crate::stream::sse_chat_stream(byte_stream, |value| {
+            value["choices"][0]["delta"]["content"]
+                .as_str()
+                .map(|s| s.to_string())
+        });
+        let name = self.name.clone();
+        Ok(Box::pin(
+            futures_util::StreamExt::map(chunk_stream, move |r| r.map_err(|e| e.wrap_backend(name.clone()))),
+        ))
     }
 
     async fn chat_openai(&self, request: &ChatRequest, model: &str) -> Result<ChatResponse, BackendError> {
@@ -148,6 +181,32 @@ impl LlmBackend for OllamaAdapter {
         })
     }
 
+    async fn chat_stream(&self, request: &ChatRequest, model: &str) -> Result<crate::backend::LlmStream, BackendError> {
+        let resp = self
+            .0
+            .client
+            .post(format!("{}/api/chat", self.0.base_url))
+            .json(&json!({
+                "model": model,
+                "stream": true,
+                "messages": request.messages.iter().map(|m| json!({"role": m.role, "content": m.content})).collect::<Vec<_>>(),
+            }))
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(BackendError::Api("ollama".into(), format!("{status}: {body}")));
+        }
+        let byte_stream = resp.bytes_stream();
+        let chunk_stream = crate::stream::sse_chat_stream(byte_stream, |value| {
+            value["message"]["content"].as_str().map(|s| s.to_string())
+        });
+        Ok(Box::pin(
+            futures_util::StreamExt::map(chunk_stream, move |r| r.map_err(|e| e.wrap_backend("ollama".into()))),
+        ))
+    }
+
     async fn embed(&self, text: &str, model: &str) -> Result<Vec<f32>, BackendError> {
         let resp = self
             .0
@@ -214,6 +273,10 @@ impl LlmBackend for LlamaCppAdapter {
         self.0.chat_openai(request, model).await
     }
 
+    async fn chat_stream(&self, request: &ChatRequest, model: &str) -> Result<crate::backend::LlmStream, BackendError> {
+        self.0.chat_stream_openai(request, model).await
+    }
+
     async fn list_models(&self) -> Result<Vec<ModelInfo>, BackendError> {
         self.0.list_models_openai().await
     }
@@ -239,6 +302,10 @@ impl LlmBackend for LmStudioAdapter {
 
     async fn chat(&self, request: &ChatRequest, model: &str) -> Result<ChatResponse, BackendError> {
         self.0.chat_openai(request, model).await
+    }
+
+    async fn chat_stream(&self, request: &ChatRequest, model: &str) -> Result<crate::backend::LlmStream, BackendError> {
+        self.0.chat_stream_openai(request, model).await
     }
 
     async fn list_models(&self) -> Result<Vec<ModelInfo>, BackendError> {

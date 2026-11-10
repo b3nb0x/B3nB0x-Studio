@@ -1,10 +1,19 @@
 use crate::types::{ChatRequest, ChatResponse, ModelInfo};
 use async_trait::async_trait;
+use futures_util::Stream;
+use std::pin::Pin;
+
+pub type LlmStream = Pin<Box<dyn Stream<Item = Result<String, BackendError>> + Send>>;
 
 #[async_trait]
 pub trait LlmBackend: Send + Sync {
     fn name(&self) -> &str;
     async fn chat(&self, request: &ChatRequest, model: &str) -> Result<ChatResponse, BackendError>;
+    async fn chat_stream(&self, request: &ChatRequest, model: &str) -> Result<LlmStream, BackendError> {
+        let resp = self.chat(request, model).await?;
+        let content = resp.content;
+        Ok(Box::pin(futures_util::stream::once(async move { Ok(content) })))
+    }
     async fn list_models(&self) -> Result<Vec<ModelInfo>, BackendError>;
     async fn embed(&self, _text: &str, _model: &str) -> Result<Vec<f32>, BackendError> {
         Err(BackendError::NotConfigured(format!(

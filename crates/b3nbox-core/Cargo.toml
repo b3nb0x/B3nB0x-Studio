@@ -19,3 +19,5 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 tracing = { workspace = true }
 rusqlite = { version = "0.32", features = ["bundled"] }
+futures-util = { workspace = true }
+bytes = "1"
