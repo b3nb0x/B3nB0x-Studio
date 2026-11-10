@@ -52,3 +52,27 @@ model = "qwen2.5-coder-14b-q4_k_m"
 [routing.scheduler]
 backend = "ollama"
 model = "llama3.1:8b"
+
+# --- Memory-Layer ---
+
+[memory]
+enabled = true
+db_path = "data/b3nbox-memory.db"
+
+# --- Permission-System ---
+# mode: "default-allow" (alles erlaubt, Ausnahmen via deny)
+#       "default-deny" (alles verboten, Ausnahmen via allow)
+# actions: chat, pipeline, task, script | scope: Route bzw. Skript-Pfad
+
+[permissions]
+mode = "default-allow"
+
+# Beispiel: Pipeline nur mit Freigabe, Skripte nur aus ./scripts
+# [[permissions.rules]]
+# effect = "deny"
+# action = "pipeline"
+#
+# [[permissions.rules]]
+# effect = "allow"
+# action = "script"
+# scope = "scripts"

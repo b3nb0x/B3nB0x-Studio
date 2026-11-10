@@ -28,6 +28,8 @@ pub struct Config {
     pub pipeline: PipelineConfig,
     #[serde(default)]
     pub memory: MemoryConfig,
+    #[serde(default)]
+    pub permissions: crate::permissions::PermissionConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

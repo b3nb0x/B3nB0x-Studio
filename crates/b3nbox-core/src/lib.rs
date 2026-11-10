@@ -4,6 +4,7 @@ pub mod config;
 pub mod memory;
 #[cfg(feature = "native-inference")]
 pub mod native;
+pub mod permissions;
 pub mod pipeline;
 pub mod router;
 pub mod types;

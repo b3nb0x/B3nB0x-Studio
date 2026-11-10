@@ -48,6 +48,7 @@ async fn main() {
             routing: HashMap::new(),
             pipeline: Default::default(),
             memory: Default::default(),
+            permissions: Default::default(),
         }
     });
 
@@ -66,8 +67,10 @@ async fn main() {
         None
     };
 
+    let permissions = Arc::new(b3nbox_core::permissions::Permissions::new(&config.permissions));
+
     let router = Arc::new(CoreRouter::new(build_backends(&config), config.routing.clone()));
-    let app_state = AppState::new(router, memory);
+    let app_state = AppState::new(router, memory, permissions);
 
     let app = axum::Router::new()
         .merge(api::routes())

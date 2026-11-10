@@ -23,6 +23,8 @@ pub fn routes() -> AxumRouter<AppState> {
         .route("/v1/tasks/{id}/run", post(run_task))
         .route("/v1/memory", get(search_memory).post(add_memory))
         .route("/v1/memory/recent", get(recent_memory))
+        .route("/v1/permissions", get(list_permissions).post(add_permission))
+        .route("/v1/permissions/check", post(check_permission))
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -53,6 +55,13 @@ async fn chat(
     Json(body): Json<ChatBody>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let route = body.route.unwrap_or_else(|| "default".into());
+    let check = state.permissions.check("chat", Some(&route));
+    if !check.allowed {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "Verweigert durch Permission-System", "check": check })),
+        ));
+    }
     match state.router.chat(&body.request, &route).await {
         Ok(resp) => Ok(Json(serde_json::to_value(resp).unwrap())),
         Err(e) => Err((StatusCode::BAD_GATEWAY, Json(json!({ "error": e.to_string() })))),
@@ -78,6 +87,10 @@ struct RunBody {
 }
 
 async fn start_run(State(state): State<AppState>, Json(body): Json<RunBody>) -> Json<serde_json::Value> {
+    let check = state.permissions.check("pipeline", None);
+    if !check.allowed {
+        return Json(json!({ "error": "Verweigert durch Permission-System", "check": check }));
+    }
     let run = state.pipeline.execute(&body.task).await;
     Json(serde_json::to_value(run).unwrap())
 }
@@ -119,6 +132,30 @@ async fn create_task(State(state): State<AppState>, Json(task): Json<serde_json:
     task["id"] = json!(id);
     state.tasks.write().await.insert(id.clone(), task.clone());
     Json(task)
+}
+
+async fn list_permissions(State(state): State<AppState>) -> Json<serde_json::Value> {
+    Json(json!({ "mode": state.permissions.mode(), "rules": state.permissions.rules() }))
+}
+
+async fn add_permission(
+    State(state): State<AppState>,
+    Json(rule): Json<b3nbox_core::permissions::PermissionRule>,
+) -> Json<serde_json::Value> {
+    state.permissions.add_rule(rule);
+    Json(json!({ "status": "added" }))
+}
+
+#[derive(Deserialize)]
+struct CheckBody {
+    action: String,
+    #[serde(default)]
+    scope: Option<String>,
+}
+
+async fn check_permission(State(state): State<AppState>, Json(body): Json<CheckBody>) -> Json<serde_json::Value> {
+    let result = state.permissions.check(&body.action, body.scope.as_deref());
+    Json(serde_json::to_value(result).unwrap())
 }
 
 async fn search_memory(
@@ -175,6 +212,12 @@ async fn run_task(State(state): State<AppState>, Path(id): Path<String>) -> Json
     match task {
         None => Json(json!({ "error": format!("Task '{id}' nicht gefunden") })),
         Some(task) => {
+            let action = if task["script"].is_null() { "task" } else { "script" };
+            let scope = task["script"].as_str();
+            let check = state.permissions.check(action, scope);
+            if !check.allowed {
+                return Json(json!({ "error": "Verweigert durch Permission-System", "check": check }));
+            }
             if task["script"].is_null() {
                 return Json(json!({ "status": "registered", "note": "Task ohne Skript - nur registriert" }));
             }
