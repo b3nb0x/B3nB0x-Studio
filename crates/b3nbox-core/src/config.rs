@@ -25,8 +25,6 @@ pub struct Config {
     #[serde(default)]
     pub routing: HashMap<String, RouteTarget>,
     #[serde(default)]
-    pub pipeline: PipelineConfig,
-    #[serde(default)]
     pub memory: MemoryConfig,
     #[serde(default)]
     pub permissions: crate::permissions::PermissionConfig,
@@ -125,12 +123,6 @@ pub struct ServerConfig {
     pub cert_path: Option<String>,
     #[serde(default)]
     pub key_path: Option<String>,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct PipelineConfig {
-    #[serde(default)]
-    pub phases: HashMap<String, RouteTarget>,
 }
 
 fn default_host() -> String {

@@ -69,7 +69,6 @@ async fn main() {
             },
             backends: HashMap::new(),
             routing: HashMap::new(),
-            pipeline: Default::default(),
             memory: Default::default(),
             permissions: Default::default(),
             mcp: HashMap::new(),

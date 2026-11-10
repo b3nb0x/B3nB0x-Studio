@@ -1,5 +1,5 @@
 use crate::backend::{BackendError, LlmBackend};
-use crate::types::{ChatMessage, ChatRequest, ChatResponse, ModelInfo};
+use crate::types::{ChatRequest, ChatResponse, ModelInfo};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde_json::{json, Value};
@@ -417,12 +417,5 @@ impl LlmBackend for NativeAdapter {
 
     async fn health(&self) -> Result<bool, BackendError> {
         Ok(self.model_path.is_some())
-    }
-}
-
-pub fn system_message(content: &str) -> ChatMessage {
-    ChatMessage {
-        role: "system".into(),
-        content: content.into(),
     }
 }

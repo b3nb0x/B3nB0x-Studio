@@ -140,7 +140,6 @@ pub struct ScheduleStatus {
     pub every_seconds: u64,
     pub approval_required: bool,
     pub next_run_in_seconds: Option<u64>,
-    pub last_result: Option<String>,
 }
 
 pub struct Scheduler {
@@ -192,7 +191,6 @@ impl Scheduler {
                 next_run_in_seconds: e
                     .next_run
                     .map(|n| n.saturating_duration_since(std::time::Instant::now()).as_secs()),
-                last_result: None,
             })
             .collect()
     }
