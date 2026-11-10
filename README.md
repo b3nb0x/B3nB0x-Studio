@@ -48,6 +48,41 @@ Agent mit eingebautem **LLM Manager** — Rust-Kern, Python-SDK und Web-GUI.
 | MCP-Bindings | `crates/b3nbox-core/src/mcp.rs` | Externe MCP-Server (JSON-RPC über stdio), Registry + Tool-Aufrufe |
 | Native-Inferenz | `crates/b3nbox-core/src/native.rs` | GGUF direkt im Server (Feature `native-inference`, benötigt libclang) |
 
+## Installation
+
+### Einzeiler (Linux x86_64 / aarch64)
+
+Der offizielle Weg (das Tool heisst hier bewusst nicht beim Namen):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/b3nb0x/B3nB0x-Studio/main/install.sh | sh
+```
+
+Der Installer:
+- laedt das passende Release-Binary (oder faellt auf Quellcode-Bau mit cargo zurueck)
+- prueft die Firewall (ufw, firewalld, nftables/iptables) und warnt, wenn Port 8300 bei aktivem Filter nicht freigegeben ist - inkl. fertiger Freigabe-Befehle
+- prueft, ob der Port bereits belegt ist
+- erzeugt Konfiguration mit frischem Admin-API-Key (--generate-key, nur der Hash landet in der Config)
+- optional: SET_SERVICE=1 richtet einen systemd-Benutzer-Service ein
+
+Varianten:
+
+```bash
+INSTALL_DIR=~/.b3nbox sh install.sh   # anderes Verzeichnis
+SET_SERVICE=1 sh install.sh           # + systemd-Service
+VERSION=v0.1.0 sh install.sh           # bestimmte Version
+```
+
+### Manuell (Quellcode)
+
+```bash
+git clone https://github.com/b3nb0x/B3nB0x-Studio && cd B3nB0x-Studio
+cargo build --release
+./target/release/b3nbox-server --generate-key    # Key + Hash erzeugen
+cp config/b3nbox.toml.example config/b3nbox.toml # Hash eintragen
+./target/release/b3nbox-server config/b3nbox.toml
+```
+
 ## Schnellstart
 
 ```bash
