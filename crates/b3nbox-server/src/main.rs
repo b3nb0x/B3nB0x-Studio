@@ -146,6 +146,12 @@ async fn main() {
     };
 
     let mut core_router = CoreRouter::new(build_backends(&config), config.routing.clone());
+    if config.routing.is_empty() {
+        tracing::warn!(
+            "Keine Routing-Eintraege konfiguriert - /v1/chat wird mit 502 fehlschlagen. \
+             Siehe [routing]-Sektion in config/b3nbox.toml.example"
+        );
+    }
     if let Some(audit) = &audit {
         core_router = core_router.with_audit(audit.clone());
     }

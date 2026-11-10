@@ -156,6 +156,25 @@ host = "127.0.0.1"   # Netzwerkzugriff: "0.0.0.0" (+ https = true + Firewall bea
 port = ${PORT}
 https = false        # true = TLS (self-signed wird auto-generiert)
 
+# --- LLM-Backend (anpassen: ollama | llamacpp | lmstudio | native) ---
+[backends.ollama]
+type = "ollama"
+url = "http://127.0.0.1:11434"
+
+# --- Routing: Route-Key -> Backend + Modell ---
+# Ohne diese Eintraege schlaegt /v1/chat mit 502 fehl.
+[routing.default]
+backend = "ollama"
+model = "qwen2.5-coder:7b"
+
+[routing.embeddings]
+backend = "ollama"
+model = "nomic-embed-text"
+
+[routing.agent]
+backend = "ollama"
+model = "qwen2.5:7b"
+
 [auth]
 enabled = true
 
