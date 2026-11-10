@@ -3,8 +3,11 @@ import Dashboard from "./pages/Dashboard";
 import Routing from "./pages/Routing";
 import Pipeline from "./pages/Pipeline";
 import Tasks from "./pages/Tasks";
+import Memory from "./pages/Memory";
+import Permissions from "./pages/Permissions";
+import Mcp from "./pages/Mcp";
 
-type Page = "dashboard" | "routing" | "pipeline" | "tasks";
+type Page = "dashboard" | "routing" | "pipeline" | "tasks" | "memory" | "permissions" | "mcp";
 
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard");
@@ -14,6 +17,9 @@ export default function App() {
     { key: "routing", label: "Modell-Routing" },
     { key: "pipeline", label: "REA/ECC Pipeline" },
     { key: "tasks", label: "Express-Tasks" },
+    { key: "memory", label: "Memory" },
+    { key: "permissions", label: "Permissions" },
+    { key: "mcp", label: "MCP-Tools" },
   ];
 
   return (
@@ -44,6 +50,9 @@ export default function App() {
         {page === "routing" && <Routing />}
         {page === "pipeline" && <Pipeline />}
         {page === "tasks" && <Tasks />}
+        {page === "memory" && <Memory />}
+        {page === "permissions" && <Permissions />}
+        {page === "mcp" && <Mcp />}
       </main>
     </div>
   );

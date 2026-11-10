@@ -26,4 +26,16 @@ export const api = {
   createTask: (task: Record<string, unknown>) =>
     req("/v1/tasks", { method: "POST", body: JSON.stringify(task) }),
   runTask: (id: string) => req(`/v1/tasks/${id}/run`, { method: "POST", body: "{}" }),
+  searchMemory: (q: string) => req(`/v1/memory?q=${encodeURIComponent(q)}`),
+  recentMemory: (limit = 10) => req(`/v1/memory/recent?limit=${limit}`),
+  addMemory: (kind: string, key: string, content: string) =>
+    req("/v1/memory", { method: "POST", body: JSON.stringify({ kind, key, content }) }),
+  permissions: () => req("/v1/permissions"),
+  addPermission: (rule: { effect: string; action: string; scope?: string }) =>
+    req("/v1/permissions", { method: "POST", body: JSON.stringify(rule) }),
+  checkPermission: (action: string, scope?: string) =>
+    req("/v1/permissions/check", { method: "POST", body: JSON.stringify({ action, scope }) }),
+  mcpTools: () => req("/v1/mcp/tools"),
+  mcpCall: (server: string, tool: string, args: unknown) =>
+    req("/v1/mcp/call", { method: "POST", body: JSON.stringify({ server, tool, arguments: args }) }),
 };
