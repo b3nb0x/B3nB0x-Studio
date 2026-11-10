@@ -52,7 +52,7 @@ Agent mit eingebautem **LLM Manager** — Rust-Kern, Python-SDK und Web-GUI.
 
 ### Einzeiler (Linux x86_64 / aarch64)
 
-Der offizielle Weg (das Tool heisst hier bewusst nicht beim Namen):
+Der offizielle Weg:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/b3nb0x/B3nB0x-Studio/main/install.sh | sh
