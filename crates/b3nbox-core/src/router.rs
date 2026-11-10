@@ -73,7 +73,7 @@ impl Router {
                 }
             }
         }
-        Err(last_err.unwrap_or_else(|| BackendError::NotConfigured("kein Fallback verfügbar".into())))
+        Err(last_err)
     }
 }
 
