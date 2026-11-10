@@ -136,6 +136,17 @@ mode = "block"
 llm_check = false
 detector_route = "injection-detector"
 
+# --- Rate-Limiting ---
+# Token-Bucket pro Client (identifiziert ueber API-Key-Name).
+# LLM-Endpunkte (chat, pipeline, agent, sessions) haben ein eigenes,
+# niedrigeres Limit. Admin kann zur Laufzeit anpassen:
+# POST /v1/rate-limit {"requests_per_minute": 150, "llm_requests_per_minute": 30}
+
+[rate_limit]
+enabled = true
+requests_per_minute = 150
+llm_requests_per_minute = 30
+
 # --- Authentifizierung ---
 # Key generieren: ./target/release/b3nbox-server --generate-key
 # Es wird NUR der Hash gespeichert, niemals der Key selbst.

@@ -1,5 +1,6 @@
 use b3nbox_core::agent::AgentLoop;
 use b3nbox_core::auth::Auth;
+use b3nbox_core::ratelimit::RateLimiter;
 use b3nbox_core::mcp::McpRegistry;
 use b3nbox_core::guard::Guard;
 use b3nbox_core::memory::MemoryLayer;
@@ -26,6 +27,7 @@ pub struct AppState {
     pub audit: Option<Arc<b3nbox_core::audit::AuditLog>>,
     pub guard: Arc<Guard>,
     pub auth: Arc<Auth>,
+    pub rate_limiter: Arc<RateLimiter>,
     pub tasks: Arc<RwLock<HashMap<String, serde_json::Value>>>,
 }
 
@@ -38,6 +40,7 @@ pub struct Components {
     pub audit: Option<Arc<b3nbox_core::audit::AuditLog>>,
     pub guard: Arc<Guard>,
     pub auth: Arc<Auth>,
+    pub rate_limiter: Arc<RateLimiter>,
 }
 
 impl AppState {
@@ -55,6 +58,7 @@ impl AppState {
             audit,
             guard,
             auth,
+            rate_limiter,
         } = components;
         Self {
             pipeline: Arc::new(Pipeline::new(router.clone(), memory.clone(), guard.clone())),
@@ -69,6 +73,7 @@ impl AppState {
             audit,
             guard,
             auth,
+            rate_limiter,
             tasks: Arc::new(RwLock::new(HashMap::new())),
         }
     }

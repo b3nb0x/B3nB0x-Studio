@@ -42,6 +42,8 @@ pub struct Config {
     pub guard: crate::guard::GuardConfig,
     #[serde(default)]
     pub auth: crate::auth::AuthConfig,
+    #[serde(default)]
+    pub rate_limit: crate::ratelimit::RateLimitConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

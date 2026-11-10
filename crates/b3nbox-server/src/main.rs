@@ -78,6 +78,7 @@ async fn main() {
             audit: Default::default(),
             guard: Default::default(),
             auth: Default::default(),
+            rate_limit: Default::default(),
         }
     });
 
@@ -169,6 +170,15 @@ async fn main() {
 
     let app_state_clone = std::sync::Arc::new(());
     let _ = app_state_clone;
+    let rate_limiter = Arc::new(b3nbox_core::ratelimit::RateLimiter::new(config.rate_limit.clone()));
+    if config.rate_limit.enabled {
+        tracing::info!(
+            "Rate-Limiting aktiv: {} Requests/min, {} LLM-Requests/min",
+            config.rate_limit.requests_per_minute,
+            config.rate_limit.llm_requests_per_minute
+        );
+    }
+
     let app_state = AppState::new(
         router,
         state::Components {
@@ -180,6 +190,7 @@ async fn main() {
             audit,
             guard,
             auth,
+            rate_limiter,
         },
     );
 

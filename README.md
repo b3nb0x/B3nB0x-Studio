@@ -124,6 +124,12 @@ print(scheduler.execute_reboot(dry_run=True))  # kein echter Reboot
 | GET | `/v1/audit` | Audit-Log (letzte LLM-Interaktionen) |
 | GET | `/v1/guard/blocked` | Injection-Guard: Config + Block-Log |
 
+## Netzwerk- & Zugriffsschutz
+
+- **Auth** (`[auth]`): API-Keys als SHA-256-Hash in der Config (`--generate-key` erzeugt Key + Hash), Session-Tokens (12h TTL), Rollen `admin`/`user` — Schreibzugriffe auf Verwaltungs-Endpunkte nur für Admins
+- **HTTPS** (`[server] https = true`): Rustls — ohne Zertifikats-Pfade wird automatisch ein Self-Signed-Zertifikat generiert (lokal); für Domänen Let's-Encrypt-Zertifikate per `cert_path`/`key_path` einbinden
+- **Rate-Limiting** (`[rate_limit]`): Token-Bucket pro Client, Standard 150 Requests/min + separates LLM-Limit (30/min), zur Laufzeit admin-einstellbar (`POST /v1/rate-limit`), `429` + `Retry-After`
+
 ## Prompt-Injection-Schutz
 
 Der Agent ist mehrschichtig gegen Prompt-Injection gehärtet:

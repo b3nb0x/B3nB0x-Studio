@@ -43,6 +43,7 @@ pub fn routes() -> AxumRouter<AppState> {
         .route("/v1/auth/login", post(auth_login))
         .route("/v1/auth/logout", post(auth_logout))
         .route("/v1/auth/me", get(auth_me))
+        .route("/v1/rate-limit", get(get_rate_limit).post(update_rate_limit))
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -582,8 +583,54 @@ pub async fn auth_middleware(
             .into_response();
     }
 
+    let client_id = info.name.clone();
     request.extensions_mut().insert(info);
+    if path == "/v1/rate-limit" {
+        return next.run(request).await;
+    }
+    let is_llm = path.starts_with("/v1/chat")
+        || path.starts_with("/v1/pipeline")
+        || path.starts_with("/v1/agent")
+        || path.starts_with("/v1/sessions/");
+    let rate_result = if is_llm {
+        state.rate_limiter.check_llm(&client_id)
+    } else {
+        state.rate_limiter.check(&client_id)
+    };
+    if let Err(retry_after) = rate_result {
+        let mut response = (StatusCode::TOO_MANY_REQUESTS, "Rate-Limit erreicht").into_response();
+        if let Ok(value) = retry_after.to_string().parse() {
+            response.headers_mut().insert("Retry-After", value);
+        }
+        return response;
+    }
+
     next.run(request).await
+}
+
+async fn get_rate_limit(State(state): State<AppState>) -> Json<serde_json::Value> {
+    Json(serde_json::to_value(state.rate_limiter.status()).unwrap())
+}
+
+#[derive(Deserialize)]
+struct UpdateRateLimitBody {
+    requests_per_minute: u32,
+    llm_requests_per_minute: u32,
+}
+
+async fn update_rate_limit(
+    State(state): State<AppState>,
+    Json(body): Json<UpdateRateLimitBody>,
+) -> Json<serde_json::Value> {
+    let status = state
+        .rate_limiter
+        .update(body.requests_per_minute, body.llm_requests_per_minute);
+    tracing::info!(
+        "Rate-Limit aktualisiert: {} Requests/min, {} LLM-Requests/min",
+        status.requests_per_minute,
+        status.llm_requests_per_minute
+    );
+    Json(serde_json::to_value(status).unwrap())
 }
 
 #[derive(Deserialize)]
