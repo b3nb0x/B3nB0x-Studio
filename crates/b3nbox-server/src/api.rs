@@ -6,6 +6,7 @@ use axum::{Json, Router as AxumRouter};
 use b3nbox_core::config::RouteTarget;
 use b3nbox_core::types::{ChatRequest, Phase};
 use serde::Deserialize;
+use std::collections::HashMap;
 use serde_json::json;
 
 pub fn routes() -> AxumRouter<AppState> {
@@ -20,6 +21,8 @@ pub fn routes() -> AxumRouter<AppState> {
         .route("/v1/pipeline/switch", post(switch_phase))
         .route("/v1/tasks", get(list_tasks).post(create_task))
         .route("/v1/tasks/{id}/run", post(run_task))
+        .route("/v1/memory", get(search_memory).post(add_memory))
+        .route("/v1/memory/recent", get(recent_memory))
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -116,6 +119,55 @@ async fn create_task(State(state): State<AppState>, Json(task): Json<serde_json:
     task["id"] = json!(id);
     state.tasks.write().await.insert(id.clone(), task.clone());
     Json(task)
+}
+
+async fn search_memory(
+    State(state): State<AppState>,
+    axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let Some(memory) = &state.memory else {
+        return Json(json!({ "error": "Memory-Layer nicht aktiviert" }));
+    };
+    let query = params.get("q").cloned().unwrap_or_default();
+    if query.is_empty() {
+        return Json(json!({ "error": "Parameter 'q' fehlt" }));
+    }
+    let limit = params.get("limit").and_then(|l| l.parse::<u32>().ok()).unwrap_or(5);
+    match memory.search(&query, limit) {
+        Ok(hits) => Json(json!({ "query": query, "results": hits })),
+        Err(e) => Json(json!({ "error": e })),
+    }
+}
+
+#[derive(Deserialize)]
+struct AddMemoryBody {
+    kind: String,
+    key: String,
+    content: String,
+}
+
+async fn add_memory(State(state): State<AppState>, Json(body): Json<AddMemoryBody>) -> Json<serde_json::Value> {
+    let Some(memory) = &state.memory else {
+        return Json(json!({ "error": "Memory-Layer nicht aktiviert" }));
+    };
+    match memory.add(&body.kind, &body.key, &body.content) {
+        Ok(id) => Json(json!({ "status": "added", "id": id })),
+        Err(e) => Json(json!({ "error": e })),
+    }
+}
+
+async fn recent_memory(
+    State(state): State<AppState>,
+    axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let Some(memory) = &state.memory else {
+        return Json(json!({ "error": "Memory-Layer nicht aktiviert" }));
+    };
+    let limit = params.get("limit").and_then(|l| l.parse::<u32>().ok()).unwrap_or(10);
+    match memory.recent(limit) {
+        Ok(hits) => Json(json!({ "results": hits })),
+        Err(e) => Json(json!({ "error": e })),
+    }
 }
 
 async fn run_task(State(state): State<AppState>, Path(id): Path<String>) -> Json<serde_json::Value> {

@@ -1,3 +1,4 @@
+use b3nbox_core::memory::MemoryLayer;
 use b3nbox_core::pipeline::Pipeline;
 use b3nbox_core::router::Router;
 use std::collections::HashMap;
@@ -8,14 +9,19 @@ use tokio::sync::RwLock;
 pub struct AppState {
     pub router: Arc<Router>,
     pub pipeline: Arc<Pipeline>,
+    pub memory: Option<Arc<MemoryLayer>>,
     pub tasks: Arc<RwLock<HashMap<String, serde_json::Value>>>,
 }
 
 impl AppState {
-    pub fn new(router: Arc<Router>) -> Self {
+    pub fn new(
+        router: Arc<Router>,
+        memory: Option<Arc<MemoryLayer>>,
+    ) -> Self {
         Self {
-            pipeline: Arc::new(Pipeline::new(router.clone())),
+            pipeline: Arc::new(Pipeline::new(router.clone(), memory.clone())),
             router,
+            memory,
             tasks: Arc::new(RwLock::new(HashMap::new())),
         }
     }

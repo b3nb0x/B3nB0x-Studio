@@ -30,13 +30,15 @@ pub struct Event {
 
 pub struct Pipeline {
     router: Arc<Router>,
+    memory: Option<Arc<crate::memory::MemoryLayer>>,
     runs: RwLock<std::collections::HashMap<String, PipelineRun>>,
 }
 
 impl Pipeline {
-    pub fn new(router: Arc<Router>) -> Self {
+    pub fn new(router: Arc<Router>, memory: Option<Arc<crate::memory::MemoryLayer>>) -> Self {
         Self {
             router,
+            memory,
             runs: RwLock::new(std::collections::HashMap::new()),
         }
     }
@@ -66,6 +68,18 @@ impl Pipeline {
         };
 
         let mut context = task.to_string();
+        if let Some(memory) = &self.memory {
+            if let Ok(hits) = memory.search(task, 5) {
+                if !hits.is_empty() {
+                    let memory_block = hits
+                        .iter()
+                        .map(|m| format!("- [{}] {}: {}", m.kind, m.key, m.content))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    context = format!("{task}\n\nRelevanter Projektkontext aus dem Memory-Layer:\n{memory_block}");
+                }
+            }
+        }
         for phase in Phase::ALL {
             let prompt = phase_prompt(&phase, &context);
             let request = ChatRequest {

@@ -11,3 +11,4 @@ gui/dist/
 config/b3nbox.toml
 .DS_Store
 *.tsbuildinfo
+data/

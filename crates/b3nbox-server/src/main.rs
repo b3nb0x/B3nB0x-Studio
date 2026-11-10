@@ -47,11 +47,27 @@ async fn main() {
             backends: HashMap::new(),
             routing: HashMap::new(),
             pipeline: Default::default(),
+            memory: Default::default(),
         }
     });
 
+    let memory = if config.memory.enabled {
+        match b3nbox_core::memory::MemoryLayer::open(&config.memory.db_path) {
+            Ok(layer) => {
+                tracing::info!("Memory-Layer aktiv: {}", config.memory.db_path);
+                Some(Arc::new(layer))
+            }
+            Err(e) => {
+                tracing::warn!("Memory-Layer deaktiviert ({e})");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     let router = Arc::new(CoreRouter::new(build_backends(&config), config.routing.clone()));
-    let app_state = AppState::new(router);
+    let app_state = AppState::new(router, memory);
 
     let app = axum::Router::new()
         .merge(api::routes())

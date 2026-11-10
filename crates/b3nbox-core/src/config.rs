@@ -26,6 +26,33 @@ pub struct Config {
     pub routing: HashMap<String, RouteTarget>,
     #[serde(default)]
     pub pipeline: PipelineConfig,
+    #[serde(default)]
+    pub memory: MemoryConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryConfig {
+    #[serde(default = "default_db_path")]
+    pub db_path: String,
+    #[serde(default = "default_memory_enabled")]
+    pub enabled: bool,
+}
+
+impl Default for MemoryConfig {
+    fn default() -> Self {
+        Self {
+            db_path: default_db_path(),
+            enabled: default_memory_enabled(),
+        }
+    }
+}
+
+fn default_db_path() -> String {
+    "data/b3nbox-memory.db".into()
+}
+
+fn default_memory_enabled() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
