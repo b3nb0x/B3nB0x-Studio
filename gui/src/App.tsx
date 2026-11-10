@@ -1,0 +1,50 @@
+import { useState } from "react";
+import Dashboard from "./pages/Dashboard";
+import Routing from "./pages/Routing";
+import Pipeline from "./pages/Pipeline";
+import Tasks from "./pages/Tasks";
+
+type Page = "dashboard" | "routing" | "pipeline" | "tasks";
+
+export default function App() {
+  const [page, setPage] = useState<Page>("dashboard");
+
+  const nav: { key: Page; label: string }[] = [
+    { key: "dashboard", label: "Dashboard" },
+    { key: "routing", label: "Modell-Routing" },
+    { key: "pipeline", label: "REA/ECC Pipeline" },
+    { key: "tasks", label: "Express-Tasks" },
+  ];
+
+  return (
+    <div style={{ fontFamily: "system-ui, sans-serif", margin: 0, padding: "1rem 2rem" }}>
+      <header style={{ display: "flex", alignItems: "center", gap: "2rem", borderBottom: "1px solid #333" }}>
+        <h1 style={{ fontSize: "1.2rem" }}>B3nBox Studio</h1>
+        <nav style={{ display: "flex", gap: "1rem" }}>
+          {nav.map((n) => (
+            <button
+              key={n.key}
+              onClick={() => setPage(n.key)}
+              style={{
+                padding: "0.4rem 0.8rem",
+                cursor: "pointer",
+                background: page === n.key ? "#4f46e5" : "transparent",
+                color: page === n.key ? "#fff" : "#4f46e5",
+                border: "1px solid #4f46e5",
+                borderRadius: 6,
+              }}
+            >
+              {n.label}
+            </button>
+          ))}
+        </nav>
+      </header>
+      <main style={{ paddingTop: "1rem" }}>
+        {page === "dashboard" && <Dashboard />}
+        {page === "routing" && <Routing />}
+        {page === "pipeline" && <Pipeline />}
+        {page === "tasks" && <Tasks />}
+      </main>
+    </div>
+  );
+}

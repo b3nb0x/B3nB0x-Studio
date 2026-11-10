@@ -1,0 +1,54 @@
+# B3nBox Studio - LLM Manager Konfiguration
+# Kopiere diese Datei nach config/b3nbox.toml und passe sie an.
+
+[server]
+host = "127.0.0.1"
+port = 8300
+
+# --- LLM Backends (Adapter) ---
+# type: ollama | llamacpp | lmstudio | native
+
+[backends.ollama]
+type = "ollama"
+url = "http://127.0.0.1:11434"
+
+[backends.llamacpp]
+type = "llamacpp"
+url = "http://127.0.0.1:8080"
+
+[backends.lmstudio]
+type = "lmstudio"
+url = "http://127.0.0.1:1234"
+
+[backends.native]
+type = "native"
+# Pfad zu einem GGUF-Modell für den eingebauten B3nBox-Native-Adapter
+# model_path = "/pfad/zu/modell.gguf"
+
+# --- Routing: Route-Key -> Backend + Modell ---
+# Route-Keys: "default", Pipeline-Phasen (analyse, plan, implement, control)
+# und eigene Task-Typen (z.B. "scheduler").
+
+[routing.default]
+backend = "ollama"
+model = "qwen2.5-coder:7b"
+
+[routing.analyse]
+backend = "ollama"
+model = "llama3.1:8b"
+
+[routing.plan]
+backend = "ollama"
+model = "llama3.1:8b"
+
+[routing.implement]
+backend = "ollama"
+model = "qwen2.5-coder:14b"
+
+[routing.control]
+backend = "llamacpp"
+model = "qwen2.5-coder-14b-q4_k_m"
+
+[routing.scheduler]
+backend = "ollama"
+model = "llama3.1:8b"

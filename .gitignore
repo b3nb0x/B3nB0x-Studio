@@ -1,0 +1,13 @@
+target/
+Cargo.lock
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+node_modules/
+gui/dist/
+config/b3nbox.toml
+.DS_Store
+*.tsbuildinfo
