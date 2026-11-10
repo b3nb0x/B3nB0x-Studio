@@ -200,7 +200,7 @@ mod tests {
         });
         assert!(limiter.check("a").is_ok());
         match limiter.check("a") {
-            Err(retry) => assert!(retry >= 1 && retry <= 60),
+            Err(retry) => assert!((1..=60).contains(&retry)),
             Ok(()) => panic!("sollte abgelehnt werden"),
         }
     }

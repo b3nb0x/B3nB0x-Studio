@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use sha2::{Digest, Sha256, Sha512};
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
@@ -8,7 +8,9 @@ use std::time::{Duration, Instant};
 pub struct ApiKeyEntry {
     pub name: String,
     pub role: String,
-    /// SHA-256-Hash des Keys (Hex, 64 Zeichen) - niemals der Klartext-Key.
+    /// Hash des Keys - niemals der Klartext-Key.
+    /// Format: "s512$<salt-hex>$<hash-hex>" (gesalzenes SHA-512) oder
+    /// Legacy: 64 Hex-Zeichen (ungesalzenes SHA-256, wird noch akzeptiert).
     pub key_hash: String,
 }
 
@@ -42,10 +44,68 @@ impl AuthInfo {
     }
 }
 
-/// Erzeugt den SHA-256-Hash eines API-Keys (Hex).
+/// Erzeugt den SHA-256-Hash eines API-Keys (Hex) - Legacy-Format.
 pub fn hash_key(key: &str) -> String {
     let digest = Sha256::digest(key.as_bytes());
     format!("{digest:x}")
+}
+
+/// Prueft einen API-Key gegen einen gespeicherten Hash.
+/// Unterstuetzt das aktuelle Format ("s512$<salt>$<hash>", gesalzenes
+/// SHA-512) und das Legacy-Format (ungesalzenes SHA-256, 64 Hex-Zeichen).
+pub fn verify_key_hash(api_key: &str, stored: &str) -> bool {
+    if let Some(rest) = stored.strip_prefix("s512$") {
+        let Some((salt_hex, hash_hex)) = rest.split_once('$') else {
+            return false;
+        };
+        let Ok(salt) = hex_decode(salt_hex) else {
+            return false;
+        };
+        let mut hasher = Sha512::new();
+        hasher.update(&salt);
+        hasher.update(api_key.as_bytes());
+        let digest = hasher.finalize();
+        constant_time_eq(&digest, &hex_decode(hash_hex).unwrap_or_default())
+    } else {
+        // Legacy: ungesalzenes SHA-256
+        stored.len() == 64
+            && stored.chars().all(|c| c.is_ascii_hexdigit())
+            && constant_time_eq(
+                &Sha256::digest(api_key.as_bytes()),
+                &hex_decode(stored).unwrap_or_default(),
+            )
+    }
+}
+
+/// Erzeugt einen neuen gesalzenen SHA-512-Hash fuer einen API-Key.
+pub fn hash_key_salted(key: &str) -> String {
+    let salt_raw = uuid::Uuid::new_v4();
+    let salt = salt_raw.as_bytes();
+    let mut hasher = Sha512::new();
+    hasher.update(salt);
+    hasher.update(key.as_bytes());
+    let digest = hasher.finalize();
+    format!("s512${}${}", hex_encode(salt), hex_encode(&digest))
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+fn hex_decode(s: &str) -> Result<Vec<u8>, ()> {
+    if !s.len().is_multiple_of(2) || !s.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(());
+    }
+    (0..s.len() / 2)
+        .map(|i| u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).map_err(|_| ()))
+        .collect()
+}
+
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.iter().zip(b.iter()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
 struct Session {
@@ -64,16 +124,18 @@ impl Auth {
     pub fn new(config: &AuthConfig) -> Result<Self, String> {
         let mut keys = Vec::new();
         for entry in &config.keys {
-            let valid = entry.key_hash.len() == 64
+            let legacy = entry.key_hash.len() == 64
                 && entry.key_hash.chars().all(|c| c.is_ascii_hexdigit());
-            if !valid {
+            let salted = entry.key_hash.starts_with("s512$")
+                && entry.key_hash.split('$').count() == 3;
+            if !legacy && !salted {
                 return Err(format!(
-                    "Key '{}' hat einen ungueltigen Hash (erwartet: 64 Hex-Zeichen). Nutze --generate-key.",
+                    "Key '{}' hat einen ungueltigen Hash (erwartet: 's512$<salt>$<hash>' oder 64 Hex-Zeichen). Nutze --generate-key.",
                     entry.name
                 ));
             }
             keys.push((
-                entry.key_hash.to_lowercase(),
+                entry.key_hash.clone(),
                 AuthInfo {
                     name: entry.name.clone(),
                     role: entry.role.clone(),
@@ -124,10 +186,9 @@ impl Auth {
     }
 
     fn verify_key(&self, api_key: &str) -> Option<AuthInfo> {
-        let hash = hash_key(api_key);
         self.keys
             .iter()
-            .find(|(key_hash, _)| *key_hash == hash)
+            .find(|(key_hash, _)| verify_key_hash(api_key, key_hash))
             .map(|(_, info)| info.clone())
     }
 
@@ -145,10 +206,10 @@ impl Auth {
     }
 }
 
-/// Generiert einen neuen API-Key mit zugehoerigem Hash fuer die Config.
+/// Generiert einen neuen API-Key mit zugehoerigem (gesalzenem) Hash fuer die Config.
 pub fn generate_key() -> (String, String) {
     let key = format!("bxk-{}", uuid::Uuid::new_v4());
-    let hash = hash_key(&key);
+    let hash = hash_key_salted(&key);
     (key, hash)
 }
 
@@ -182,6 +243,25 @@ mod tests {
         assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
         assert_eq!(hash, hash_key("hallo"));
         assert_ne!(hash, hash_key("andere"));
+    }
+
+    #[test]
+    fn salted_hash_roundtrip() {
+        let hash = hash_key_salted("bxk-mein-key");
+        assert!(hash.starts_with("s512$"));
+        assert!(verify_key_hash("bxk-mein-key", &hash));
+        assert!(!verify_key_hash("bxk-falsch", &hash));
+        // Gleicher Key, neuer Hash (neues Salt) - beide gelten
+        let hash2 = hash_key_salted("bxk-mein-key");
+        assert_ne!(hash, hash2);
+        assert!(verify_key_hash("bxk-mein-key", &hash2));
+    }
+
+    #[test]
+    fn legacy_sha256_hash_still_accepted() {
+        let hash = hash_key("bxk-legacy-key");
+        assert!(verify_key_hash("bxk-legacy-key", &hash));
+        assert!(!verify_key_hash("bxk-andere", &hash));
     }
 
     #[test]
@@ -241,6 +321,6 @@ mod tests {
         assert_ne!(key1, key2);
         assert_ne!(hash1, hash2);
         assert!(key1.starts_with("bxk-"));
-        assert_eq!(hash1, hash_key(&key1));
+        assert!(verify_key_hash(&key1, &hash1));
     }
 }

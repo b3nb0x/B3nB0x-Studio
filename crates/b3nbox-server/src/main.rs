@@ -13,6 +13,10 @@ mod tls;
 
 use state::AppState;
 
+/// Verzeichnis mit dem gebauten GUI (vite build). Wenn vorhanden,
+/// liefert der Server die GUI statisch aus.
+const GUI_DIST: &str = "gui/dist";
+
 fn build_backends(config: &Config) -> HashMap<String, Arc<dyn LlmBackend>> {
     let mut backends: HashMap<String, Arc<dyn LlmBackend>> = HashMap::new();
     for (name, bc) in &config.backends {
@@ -167,8 +171,6 @@ async fn main() {
         if config.guard.mode == b3nbox_core::guard::GuardMode::Block { "block" } else { "log-only" }
     );
 
-    let app_state_clone = std::sync::Arc::new(());
-    let _ = app_state_clone;
     let rate_limiter = Arc::new(b3nbox_core::ratelimit::RateLimiter::new(config.rate_limit.clone()));
     if config.rate_limit.enabled {
         tracing::info!(
@@ -208,8 +210,18 @@ async fn main() {
             app_state.clone(),
             api::auth_middleware,
         ))
-        .with_state(app_state)
-        .route("/", get(|| async { axum::Json(serde_json::json!({ "service": "B3nBox Studio LLM Manager", "docs": "/v1/models, /v1/chat, /v1/routing, /v1/pipeline, /v1/tasks" })) }));
+        .with_state(app_state);
+    // GUI statisch ausliefern, wenn ein Build vorhanden ist (gui/dist);
+    // sonst bleibt "/" die Info-Route.
+    let app = if std::path::Path::new(GUI_DIST).exists() {
+        tracing::info!("GUI-Verzeichnis gefunden, statisches Serving aktiv: {GUI_DIST}");
+        app.fallback_service(tower_http::services::ServeDir::new(GUI_DIST))
+    } else {
+        app.route(
+            "/",
+            get(|| async { axum::Json(serde_json::json!({ "service": "B3nBox Studio LLM Manager", "docs": "/v1/models, /v1/chat, /v1/routing, /v1/pipeline, /v1/tasks" })) }),
+        )
+    };
 
     let addr = format!("{}:{}", config.server.host, config.server.port);
     if config.server.https {

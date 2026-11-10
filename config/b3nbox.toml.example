@@ -150,6 +150,9 @@ llm_requests_per_minute = 30
 # --- Authentifizierung ---
 # Key generieren: ./target/release/b3nbox-server --generate-key
 # Es wird NUR der Hash gespeichert, niemals der Key selbst.
+# Format: "s512$<salt>$<hash>" (gesalzenes SHA-512). Legacy: 64 Hex-Zeichen
+# (ungesalzenes SHA-256) wird weiterhin akzeptiert - Empfehlung: Keys neu
+# generieren und die Hashes ersetzen.
 # Rollen: "admin" (alles erlaubt) | "user" (Schreib-Rechte nur ausserhalb
 #         der Admin-Pfade: permissions/scripts/schedule/rate-limit)
 

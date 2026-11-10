@@ -134,7 +134,7 @@ mod tests {
             "default-deny",
         );
         assert!(p.check("chat", None).allowed);
-        assert!(!p.check("pipeline".into(), None).allowed);
+        assert!(!p.check("pipeline", None).allowed);
     }
 
     #[test]
