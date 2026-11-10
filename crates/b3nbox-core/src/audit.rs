@@ -18,6 +18,16 @@ pub struct AuditEntry {
     pub prompt_hash: String,
 }
 
+pub struct AuditRecord<'a> {
+    pub route: &'a str,
+    pub backend: &'a str,
+    pub model: &'a str,
+    pub duration_ms: u64,
+    pub status: &'a str,
+    pub prompt: &'a str,
+    pub response: &'a str,
+}
+
 pub struct AuditLog {
     conn: Mutex<Connection>,
 }
@@ -49,31 +59,22 @@ impl AuditLog {
         })
     }
 
-    pub fn log(
-        &self,
-        route: &str,
-        backend: &str,
-        model: &str,
-        duration_ms: u64,
-        status: &str,
-        prompt: &str,
-        response: &str,
-    ) -> Result<(), String> {
+    pub fn log(&self, record: AuditRecord<'_>) -> Result<(), String> {
         let mut hasher = DefaultHasher::new();
-        prompt.hash(&mut hasher);
+        record.prompt.hash(&mut hasher);
         let prompt_hash = format!("{:016x}", hasher.finish());
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT INTO audit_log (route, backend, model, duration_ms, status, prompt_chars, response_chars, prompt_hash)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             rusqlite::params![
-                route,
-                backend,
-                model,
-                duration_ms as i64,
-                status,
-                prompt.chars().count() as i64,
-                response.chars().count() as i64,
+                record.route,
+                record.backend,
+                record.model,
+                record.duration_ms as i64,
+                record.status,
+                record.prompt.chars().count() as i64,
+                record.response.chars().count() as i64,
                 prompt_hash
             ],
         )
@@ -120,10 +121,26 @@ mod tests {
     fn log_and_recent() {
         let audit = AuditLog::open(":memory:").unwrap();
         audit
-            .log("default", "ollama", "llama3", 123, "ok", "Hallo Welt", "Hi!")
+            .log(AuditRecord {
+                route: "default",
+                backend: "ollama",
+                model: "llama3",
+                duration_ms: 123,
+                status: "ok",
+                prompt: "Hallo Welt",
+                response: "Hi!",
+            })
             .unwrap();
         audit
-            .log("analyse", "ollama", "llama3", 456, "error", "Analyse...", "")
+            .log(AuditRecord {
+                route: "analyse",
+                backend: "ollama",
+                model: "llama3",
+                duration_ms: 456,
+                status: "error",
+                prompt: "Analyse...",
+                response: "",
+            })
             .unwrap();
 
         let entries = audit.recent(10).unwrap();

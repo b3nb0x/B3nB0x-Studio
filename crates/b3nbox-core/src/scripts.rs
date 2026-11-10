@@ -11,6 +11,12 @@ pub struct ScriptSpec {
     pub args: Vec<String>,
     #[serde(default)]
     pub description: String,
+    #[serde(default = "default_timeout")]
+    pub timeout_secs: u64,
+}
+
+fn default_timeout() -> u64 {
+    300
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,11 +92,24 @@ impl ScriptRunner {
             });
         }
 
-        let output = tokio::process::Command::new(&spec.command)
-            .args(&spec.args)
-            .output()
-            .await
-            .map_err(|e| format!("Ausführung fehlgeschlagen: {e}"))?;
+        let run = tokio::process::Command::new(&spec.command).args(&spec.args).output();
+        let output = match tokio::time::timeout(
+            std::time::Duration::from_secs(spec.timeout_secs),
+            run,
+        )
+        .await
+        {
+            Ok(result) => result.map_err(|e| format!("Ausführung fehlgeschlagen: {e}"))?,
+            Err(_) => {
+                return Ok(ScriptResult {
+                    name: name.to_string(),
+                    status: "timeout".into(),
+                    returncode: None,
+                    stdout: String::new(),
+                    stderr: format!("Timeout nach {}s erreicht", spec.timeout_secs),
+                })
+            }
+        };
 
         Ok(ScriptResult {
             name: name.to_string(),
@@ -231,6 +250,7 @@ mod tests {
                 command: "echo".into(),
                 args: vec!["hallo-welt".into()],
                 description: "Echo-Test".into(),
+                timeout_secs: 30,
             })
             .await
             .unwrap();
@@ -248,6 +268,7 @@ mod tests {
                 command: "/usr/bin/evil".into(),
                 args: vec![],
                 description: String::new(),
+                timeout_secs: 30,
             })
             .await
             .unwrap_err();
@@ -263,6 +284,7 @@ mod tests {
                 command: "echo".into(),
                 args: vec![],
                 description: String::new(),
+                timeout_secs: 30,
             })
             .await
             .unwrap();
@@ -270,6 +292,24 @@ mod tests {
         assert_eq!(blocked.status, "awaiting-approval");
         let approved = runner.run("reboot", true).await.unwrap();
         assert_eq!(approved.status, "completed");
+    }
+
+    #[tokio::test]
+    async fn script_timeout_returns_timeout_status() {
+        let runner = ScriptRunner::new(vec![], false);
+        runner
+            .register(ScriptSpec {
+                name: "slow".into(),
+                command: "sleep".into(),
+                args: vec!["10".into()],
+                description: String::new(),
+                timeout_secs: 1,
+            })
+            .await
+            .unwrap();
+        let result = runner.run("slow", true).await.unwrap();
+        assert_eq!(result.status, "timeout");
+        assert!(result.stderr.contains("Timeout"));
     }
 
     #[tokio::test]
@@ -281,6 +321,7 @@ mod tests {
                 command: "echo".into(),
                 args: vec!["scheduled".into()],
                 description: String::new(),
+                timeout_secs: 30,
             })
             .await
             .unwrap();

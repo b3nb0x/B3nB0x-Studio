@@ -377,7 +377,15 @@ async fn run_script(
     Path(name): Path<String>,
     body: Option<Json<RunScriptBody>>,
 ) -> Json<serde_json::Value> {
-    let check = state.permissions.check("script", Some(&name));
+    let scope = state
+        .scripts
+        .list()
+        .await
+        .iter()
+        .find(|s| s.name == name)
+        .map(|s| s.command.clone())
+        .unwrap_or_else(|| name.clone());
+    let check = state.permissions.check("script", Some(&scope));
     if !check.allowed {
         return Json(json!({ "error": "Verweigert durch Permission-System", "check": check }));
     }

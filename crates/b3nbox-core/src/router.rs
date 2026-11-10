@@ -68,15 +68,15 @@ impl Router {
                     Ok(resp) => ("ok", resp.content.clone(), resp.duration_ms),
                     Err(e) => ("error", e.to_string(), start.elapsed().as_millis() as u64),
                 };
-                let _ = audit.log(
-                    route_key,
-                    &target.backend,
-                    &target.model,
+                let _ = audit.log(crate::audit::AuditRecord {
+                    route: route_key,
+                    backend: &target.backend,
+                    model: &target.model,
                     duration_ms,
                     status,
-                    &prompt,
-                    &response,
-                );
+                    prompt: &prompt,
+                    response: &response,
+                });
             }
             return result;
         }

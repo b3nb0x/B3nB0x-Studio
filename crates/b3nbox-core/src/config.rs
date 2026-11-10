@@ -115,18 +115,10 @@ pub struct ServerConfig {
     pub port: u16,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PipelineConfig {
     #[serde(default)]
     pub phases: HashMap<String, RouteTarget>,
-}
-
-impl Default for PipelineConfig {
-    fn default() -> Self {
-        Self {
-            phases: HashMap::new(),
-        }
-    }
 }
 
 fn default_host() -> String {

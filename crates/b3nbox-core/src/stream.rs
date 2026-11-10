@@ -82,7 +82,18 @@ where
                     }
                 }
                 Poll::Ready(Some(Err(e))) => return Poll::Ready(Some(Err(StreamError::Http(e)))),
-                Poll::Ready(None) => return Poll::Ready(None),
+                Poll::Ready(None) => {
+                    if let Some(data) = buffer.trim().strip_prefix("data: ") {
+                        if data.trim() != "[DONE]" {
+                            if let Ok(value) = serde_json::from_str::<serde_json::Value>(data.trim()) {
+                                if let Some(chunk) = extract(&value) {
+                                    return Poll::Ready(Some(Ok(chunk)));
+                                }
+                            }
+                        }
+                    }
+                    return Poll::Ready(None);
+                }
                 Poll::Pending => return Poll::Pending,
             }
         }

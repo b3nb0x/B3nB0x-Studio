@@ -105,7 +105,7 @@ impl MemoryLayer {
     }
 
     pub fn search(&self, query: &str, limit: u32) -> Result<Vec<Memory>, String> {
-        let pattern = format!("%{}%", query.replace('%', ""));
+        let pattern = format!("%{}%", query.replace(['%', '_'], ""));
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn
             .prepare(

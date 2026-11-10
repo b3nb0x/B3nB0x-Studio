@@ -130,7 +130,13 @@ impl McpClient {
         let mut reader = BufReader::new(stdout);
         loop {
             let mut line = String::new();
-            reader.read_line(&mut line)?;
+            let bytes_read = reader.read_line(&mut line)?;
+            if bytes_read == 0 {
+                return Err(McpError::Server(
+                    self.name.clone(),
+                    "MCP-Server hat stdout geschlossen (EOF)".into(),
+                ));
+            }
             if line.trim().is_empty() {
                 continue;
             }
