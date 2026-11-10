@@ -148,6 +148,25 @@ impl LlmBackend for OllamaAdapter {
         })
     }
 
+    async fn embed(&self, text: &str, model: &str) -> Result<Vec<f32>, BackendError> {
+        let resp = self
+            .0
+            .client
+            .post(format!("{}/api/embeddings", self.0.base_url))
+            .json(&json!({ "model": model, "prompt": text }))
+            .send()
+            .await?;
+        let status = resp.status();
+        let body: Value = resp.json().await?;
+        if !status.is_success() {
+            return Err(BackendError::Api("ollama".into(), body.to_string()));
+        }
+        body["embedding"]
+            .as_array()
+            .map(|arr| arr.iter().filter_map(|v| v.as_f64().map(|f| f as f32)).collect())
+            .ok_or_else(|| BackendError::Api("ollama".into(), "Kein 'embedding' in der Antwort".into()))
+    }
+
     async fn list_models(&self) -> Result<Vec<ModelInfo>, BackendError> {
         let resp: Value = self
             .0

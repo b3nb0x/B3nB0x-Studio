@@ -2,6 +2,7 @@ pub mod agent;
 pub mod adapters;
 pub mod backend;
 pub mod config;
+pub mod embeddings;
 pub mod mcp;
 pub mod memory;
 #[cfg(feature = "native-inference")]

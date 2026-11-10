@@ -23,6 +23,7 @@ pub fn routes() -> AxumRouter<AppState> {
         .route("/v1/tasks/{id}/run", post(run_task))
         .route("/v1/memory", get(search_memory).post(add_memory))
         .route("/v1/memory/recent", get(recent_memory))
+        .route("/v1/memory/search-semantic", post(search_semantic))
         .route("/v1/permissions", get(list_permissions).post(add_permission))
         .route("/v1/permissions/check", post(check_permission))
         .route("/v1/mcp/tools", get(mcp_tools))
@@ -135,6 +136,35 @@ async fn create_task(State(state): State<AppState>, Json(task): Json<serde_json:
     task["id"] = json!(id);
     state.tasks.write().await.insert(id.clone(), task.clone());
     Json(task)
+}
+
+async fn search_semantic(
+    State(state): State<AppState>,
+    axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let Some(memory) = &state.memory else {
+        return Json(json!({ "error": "Memory-Layer nicht aktiviert" }));
+    };
+    let Some(query) = params.get("q") else {
+        return Json(json!({ "error": "Parameter 'q' fehlt" }));
+    };
+    let route = params.get("route").cloned().unwrap_or_else(|| "embeddings".into());
+    let Some(target) = state.router.route_for(&route).await else {
+        return Json(json!({ "error": format!("Keine Route '{route}' fuer Embeddings konfiguriert") }));
+    };
+    let Some(backend) = state.router.backend(&target.backend) else {
+        return Json(json!({ "error": format!("Backend '{}' nicht gefunden", target.backend) }));
+    };
+    let limit = params.get("limit").and_then(|l| l.parse::<u32>().ok()).unwrap_or(5);
+
+    let query_vec = match backend.embed(query, &target.model).await {
+        Ok(v) => v,
+        Err(e) => return Json(json!({ "error": format!("Embedding-Fehler: {e}") })),
+    };
+    match memory.search_similar(&query_vec, limit) {
+        Ok(hits) => Json(json!({ "query": query, "results": hits })),
+        Err(e) => Json(json!({ "error": e })),
+    }
 }
 
 async fn list_permissions(State(state): State<AppState>) -> Json<serde_json::Value> {
@@ -270,14 +300,28 @@ struct AddMemoryBody {
     kind: String,
     key: String,
     content: String,
+    #[serde(default)]
+    embed: bool,
 }
 
 async fn add_memory(State(state): State<AppState>, Json(body): Json<AddMemoryBody>) -> Json<serde_json::Value> {
     let Some(memory) = &state.memory else {
         return Json(json!({ "error": "Memory-Layer nicht aktiviert" }));
     };
+    if body.embed {
+        if let Some(route) = state.router.route_for("embeddings").await {
+            if let Some(backend) = state.router.backend(&route.backend) {
+                if let Ok(embedding) = backend.embed(&body.content, &route.model).await {
+                    return match memory.add_with_embedding(&body.kind, &body.key, &body.content, Some(&embedding)) {
+                        Ok(id) => Json(json!({ "status": "added", "id": id, "embedded": true })),
+                        Err(e) => Json(json!({ "error": e })),
+                    };
+                }
+            }
+        }
+    }
     match memory.add(&body.kind, &body.key, &body.content) {
-        Ok(id) => Json(json!({ "status": "added", "id": id })),
+        Ok(id) => Json(json!({ "status": "added", "id": id, "embedded": false })),
         Err(e) => Json(json!({ "error": e })),
     }
 }
