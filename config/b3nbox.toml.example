@@ -53,6 +53,16 @@ model = "qwen2.5-coder-14b-q4_k_m"
 backend = "ollama"
 model = "llama3.1:8b"
 
+# Route fuer Embeddings (semantische Memory-Suche + auto-Embedding)
+[routing.embeddings]
+backend = "ollama"
+model = "nomic-embed-text"
+
+# Route fuer den Agenten (Tool-Use)
+[routing.agent]
+backend = "ollama"
+model = "qwen2.5:14b"
+
 # --- Memory-Layer ---
 
 [memory]
@@ -86,3 +96,10 @@ mode = "default-allow"
 # [mcp.git]
 # command = "npx"
 # args = ["-y", "@modelcontextprotocol/server-git"]
+
+# --- Skripte & Scheduler ---
+# Skripte nur aus erlaubten Verzeichnissen, Ausführung nur mit Freigabe
+
+[scripts]
+allowed_dirs = ["scripts"]
+require_approval = true

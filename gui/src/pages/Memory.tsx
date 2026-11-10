@@ -20,6 +20,12 @@ export default function Memory() {
     setResults(r.results ?? []);
   };
 
+  const semanticSearch = async () => {
+    if (!query) return;
+    const r = await api.searchSemantic(query);
+    setResults(r.results ?? r.error ?? []);
+  };
+
   const add = async () => {
     if (!key || !content) return;
     await api.addMemory(kind, key, content);
@@ -37,6 +43,9 @@ export default function Memory() {
       <div style={{ display: "flex", gap: "0.5rem" }}>
         <input style={{ flex: 1 }} placeholder="Suchbegriff" value={query} onChange={(e) => setQuery(e.target.value)} />
         <button onClick={search}>Suchen</button>
+        <button onClick={semanticSearch} title="Benötigt Route 'embeddings' (z.B. nomic-embed-text)">
+          Semantisch
+        </button>
       </div>
       {results && (
         <ul>

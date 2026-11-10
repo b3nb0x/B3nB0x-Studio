@@ -6,8 +6,10 @@ import Tasks from "./pages/Tasks";
 import Memory from "./pages/Memory";
 import Permissions from "./pages/Permissions";
 import Mcp from "./pages/Mcp";
+import Agent from "./pages/Agent";
+import Scripts from "./pages/Scripts";
 
-type Page = "dashboard" | "routing" | "pipeline" | "tasks" | "memory" | "permissions" | "mcp";
+type Page = "dashboard" | "routing" | "pipeline" | "tasks" | "memory" | "permissions" | "mcp" | "agent" | "scripts";
 
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard");
@@ -20,6 +22,8 @@ export default function App() {
     { key: "memory", label: "Memory" },
     { key: "permissions", label: "Permissions" },
     { key: "mcp", label: "MCP-Tools" },
+    { key: "agent", label: "Agent" },
+    { key: "scripts", label: "Skripte" },
   ];
 
   return (
@@ -53,6 +57,8 @@ export default function App() {
         {page === "memory" && <Memory />}
         {page === "permissions" && <Permissions />}
         {page === "mcp" && <Mcp />}
+        {page === "agent" && <Agent />}
+        {page === "scripts" && <Scripts />}
       </main>
     </div>
   );

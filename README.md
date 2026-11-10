@@ -111,6 +111,12 @@ print(scheduler.execute_reboot(dry_run=True))  # kein echter Reboot
 | POST | `/v1/permissions/check` | Aktion gegen Regeln prüfen |
 | GET | `/v1/mcp/tools` | Tools aller verbundenen MCP-Server |
 | POST | `/v1/mcp/call` | MCP-Tool aufrufen (`server`, `tool`, `arguments`) |
+| POST | `/v1/agent/run` | Agent-Loop mit Tool-Use starten (`task`, `route`, `max_iterations`) |
+| POST | `/v1/memory/search-semantic` | Semantische Suche (Embeddings über Route `embeddings`) |
+| GET/POST | `/v1/scripts` | Skripte listen / registrieren (Pfad-Einschränkung, Approval-Gate) |
+| POST | `/v1/scripts/{name}/run` | Skript ausführen (`approval`-Flag) |
+| GET/POST/DELETE | `/v1/schedule` | Schedules listen / anlegen / entfernen |
+| POST | `/v1/schedule/tick` | Scheduler-Tick manuell auslösen |
 
 ### Native Inferenz (GGUF direkt im Server)
 
@@ -127,7 +133,7 @@ cargo build --release --features b3nbox-server/native-inference
 
 ## Roadmap
 
-- **Phase 3**: KV-Cache-Reuse für Native-Inferenz, Vektor-Suche (sqlite-vec/Embeddings), Plugin-/Persona-System, Session-Management, Agent-Loop mit Tool-Use
+- **Phase 4**: KV-Cache-Reuse für Native-Inferenz, Plugin-/Persona-System, Session-Management, Streaming (SSE), Agent-Tools für Express-Tasks
 - Einfluss-Quellen: Openclaw (Personas/Plugins), Hermes (Tool-Orchestrierung), Opencode (Session-Management), Claude Code (Plan Mode, Permissions)
 
 ## Lizenz

@@ -38,4 +38,21 @@ export const api = {
   mcpTools: () => req("/v1/mcp/tools"),
   mcpCall: (server: string, tool: string, args: unknown) =>
     req("/v1/mcp/call", { method: "POST", body: JSON.stringify({ server, tool, arguments: args }) }),
+  agentRun: (task: string, route: string, maxIterations: number) =>
+    req("/v1/agent/run", {
+      method: "POST",
+      body: JSON.stringify({ task, route, max_iterations: maxIterations }),
+    }),
+  listScripts: () => req("/v1/scripts"),
+  registerScript: (spec: { name: string; command: string; args: string[]; description: string }) =>
+    req("/v1/scripts", { method: "POST", body: JSON.stringify(spec) }),
+  runScript: (name: string, approval: boolean) =>
+    req(`/v1/scripts/${name}/run`, { method: "POST", body: JSON.stringify({ approval }) }),
+  listSchedule: () => req("/v1/schedule"),
+  addSchedule: (entry: { name: string; script: string; args: string[]; every_seconds: number; approval_required: boolean }) =>
+    req("/v1/schedule", { method: "POST", body: JSON.stringify(entry) }),
+  removeSchedule: (name: string) =>
+    req(`/v1/schedule?name=${encodeURIComponent(name)}`, { method: "DELETE" }),
+  searchSemantic: (q: string) =>
+    req(`/v1/memory/search-semantic?q=${encodeURIComponent(q)}`, { method: "POST" }),
 };
