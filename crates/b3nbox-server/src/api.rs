@@ -27,6 +27,7 @@ pub fn routes() -> AxumRouter<AppState> {
         .route("/v1/permissions/check", post(check_permission))
         .route("/v1/mcp/tools", get(mcp_tools))
         .route("/v1/mcp/call", post(mcp_call))
+        .route("/v1/agent/run", post(agent_run))
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -158,6 +159,68 @@ struct CheckBody {
 async fn check_permission(State(state): State<AppState>, Json(body): Json<CheckBody>) -> Json<serde_json::Value> {
     let result = state.permissions.check(&body.action, body.scope.as_deref());
     Json(serde_json::to_value(result).unwrap())
+}
+
+fn build_tool_registry(state: &AppState) -> b3nbox_core::agent::ToolRegistry {
+    use b3nbox_core::agent::{ToolHandler, ToolRegistry, ToolSpec};
+    use std::sync::Arc;
+
+    let mut tools = ToolRegistry::new();
+
+    for (server, mcp_tools) in state.mcp.list_tools() {
+        for tool in mcp_tools {
+            let server_name = server.clone();
+            let tool_name = tool.name.clone();
+            let mcp = state.mcp.clone();
+            let perms = state.permissions.clone();
+            tools.register(
+                ToolSpec {
+                    name: format!("mcp_{server_name}_{tool_name}"),
+                    description: tool
+                        .description
+                        .unwrap_or_else(|| format!("MCP-Tool {server_name}:{tool_name}")),
+                    parameters: serde_json::json!({}),
+                },
+                Arc::new(move |args: &serde_json::Value| {
+                    let check = perms.check("mcp_tool", Some(&format!("{server_name}:{tool_name}")));
+                    if !check.allowed {
+                        return Err("Verweigert durch Permission-System".to_string());
+                    }
+                    mcp.call(&server_name, &tool_name, args.clone())
+                        .map_err(|e| e.to_string())
+                        .map(|r| r.to_string())
+                }) as ToolHandler,
+            );
+        }
+    }
+
+    tools
+}
+
+#[derive(Deserialize)]
+struct AgentRunBody {
+    task: String,
+    #[serde(default)]
+    route: Option<String>,
+    #[serde(default)]
+    max_iterations: Option<u32>,
+}
+
+async fn agent_run(State(state): State<AppState>, Json(body): Json<AgentRunBody>) -> Json<serde_json::Value> {
+    let check = state.permissions.check("agent", None);
+    if !check.allowed {
+        return Json(json!({ "error": "Verweigert durch Permission-System", "check": check }));
+    }
+    let config = b3nbox_core::agent::AgentConfig {
+        route: body.route.unwrap_or_else(|| "agent".into()),
+        max_iterations: body.max_iterations.unwrap_or(8),
+        ..Default::default()
+    };
+    let tools = build_tool_registry(&state);
+    match state.agent.run(&body.task, &tools, &config).await {
+        Ok(run) => Json(serde_json::to_value(run).unwrap()),
+        Err(e) => Json(json!({ "status": "error", "error": e.to_string() })),
+    }
 }
 
 async fn mcp_tools(State(state): State<AppState>) -> Json<serde_json::Value> {
