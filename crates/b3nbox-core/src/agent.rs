@@ -199,10 +199,13 @@ impl AgentLoop {
                     });
                 }
                 AgentDecision::Tool { tool, arguments } => {
-                    let raw_result = tools
-                        .call(&tool, arguments.clone())
-                        .await
-                        .unwrap_or_else(|e| format!("Tool-Fehler: {e}"));
+                    let raw_result = match self.guard.validate_tool_arguments(&tool, &arguments) {
+                        Err(reason) => format!("Tool-Fehler: {reason}"),
+                        Ok(()) => tools
+                            .call(&tool, arguments.clone())
+                            .await
+                            .unwrap_or_else(|e| format!("Tool-Fehler: {e}")),
+                    };
 
                     let output_verdict = self.guard.scan(&raw_result, crate::guard::GuardContext::ToolOutput);
                     let tool_result = if output_verdict.blocked {
@@ -445,6 +448,54 @@ mod tests {
         assert_eq!(run.steps[0].tool.as_deref(), Some("evil"));
         let raw = run.steps[0].tool_result.as_deref().unwrap();
         assert!(raw.contains("<|im_start|>"), "Raw-Output bleibt im Step-Log erhalten");
+    }
+
+    #[tokio::test]
+    async fn agent_blocks_dangerous_tool_arguments() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let responses = vec![
+            "{\"tool\": \"run\", \"arguments\": {\"cmd\": \"ls; rm -rf /\"}}".into(),
+            "{\"final\": \"Fertig\"}".into(),
+        ];
+        let mut backends: HashMap<String, Arc<dyn LlmBackend>> = HashMap::new();
+        backends.insert(
+            "scripted".to_string(),
+            Arc::new(ScriptedBackend::new(responses, calls.clone())),
+        );
+        let mut routing = HashMap::new();
+        routing.insert(
+            "agent".to_string(),
+            RouteTarget {
+                backend: "scripted".into(),
+                model: "test".into(),
+            },
+        );
+        let router = Arc::new(Router::new(backends, routing));
+        let agent = AgentLoop::new(router, Arc::new(crate::guard::Guard::new(crate::guard::GuardConfig::default())));
+
+        let executed = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let executed_clone = executed.clone();
+        let mut tools = ToolRegistry::new();
+        tools.register(
+            ToolSpec {
+                name: "run".into(),
+                description: "Fuehrt was aus".into(),
+                parameters: serde_json::json!({"cmd": "string"}),
+            },
+            Arc::new(move |_args| {
+                executed_clone.fetch_add(1, Ordering::SeqCst);
+                Box::pin(async move { Ok("ausgefuehrt".to_string()) })
+            }),
+        );
+
+        let run = agent
+            .run("Fuehre den Befehl aus", &tools, &AgentConfig::default())
+            .await
+            .unwrap();
+
+        assert_eq!(run.status, "completed");
+        assert_eq!(executed.load(Ordering::SeqCst), 0, "Tool darf bei blockierten Argumenten nicht ausgefuehrt werden");
+        assert!(run.steps[0].tool_result.as_deref().unwrap().contains("Tool-Fehler"));
     }
 
     #[tokio::test]

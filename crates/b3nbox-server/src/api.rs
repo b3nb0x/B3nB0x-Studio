@@ -372,6 +372,12 @@ async fn register_script(
     if !check.allowed {
         return Json(json!({ "error": "Verweigert durch Permission-System", "check": check }));
     }
+    if let Err(reason) = state
+        .guard
+        .validate_script_spec(&spec.name, &spec.command, &spec.args)
+    {
+        return Json(json!({ "error": reason }));
+    }
     match state.scripts.register(spec).await {
         Ok(()) => Json(json!({ "status": "registered" })),
         Err(e) => Json(json!({ "error": e })),
@@ -577,7 +583,22 @@ async fn agent_run(State(state): State<AppState>, Json(body): Json<AgentRunBody>
     };
     let tools = build_tool_registry(&state).await;
     match state.agent.run(&body.task, &tools, &config).await {
-        Ok(run) => Json(serde_json::to_value(run).unwrap()),
+        Ok(run) => {
+            if run.status == "blocked" {
+                if let Some(audit) = &state.audit {
+                    let _ = audit.log(b3nbox_core::audit::AuditRecord {
+                        route: "guard",
+                        backend: "-",
+                        model: "-",
+                        duration_ms: 0,
+                        status: "blocked",
+                        prompt: &run.task,
+                        response: run.error.as_deref().unwrap_or(""),
+                    });
+                }
+            }
+            Json(serde_json::to_value(run).unwrap())
+        }
         Err(e) => Json(json!({ "status": "error", "error": e.to_string() })),
     }
 }
