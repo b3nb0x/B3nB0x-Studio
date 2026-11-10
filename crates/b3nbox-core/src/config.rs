@@ -32,6 +32,25 @@ pub struct Config {
     pub permissions: crate::permissions::PermissionConfig,
     #[serde(default)]
     pub mcp: std::collections::HashMap<String, crate::mcp::McpServerConfig>,
+    #[serde(default)]
+    pub scripts: ScriptsConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScriptsConfig {
+    #[serde(default)]
+    pub allowed_dirs: Vec<String>,
+    #[serde(default)]
+    pub require_approval: bool,
+}
+
+impl Default for ScriptsConfig {
+    fn default() -> Self {
+        Self {
+            allowed_dirs: vec!["scripts".into()],
+            require_approval: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

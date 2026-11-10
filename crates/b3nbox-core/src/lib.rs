@@ -10,4 +10,5 @@ pub mod native;
 pub mod permissions;
 pub mod pipeline;
 pub mod router;
+pub mod scripts;
 pub mod types;

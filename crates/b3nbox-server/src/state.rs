@@ -4,6 +4,7 @@ use b3nbox_core::memory::MemoryLayer;
 use b3nbox_core::permissions::Permissions;
 use b3nbox_core::pipeline::Pipeline;
 use b3nbox_core::router::Router;
+use b3nbox_core::scripts::{Scheduler, ScriptRunner};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -16,6 +17,8 @@ pub struct AppState {
     pub permissions: Arc<Permissions>,
     pub mcp: Arc<McpRegistry>,
     pub agent: Arc<AgentLoop>,
+    pub scripts: Arc<ScriptRunner>,
+    pub scheduler: Arc<Scheduler>,
     pub tasks: Arc<RwLock<HashMap<String, serde_json::Value>>>,
 }
 
@@ -25,6 +28,7 @@ impl AppState {
         memory: Option<Arc<MemoryLayer>>,
         permissions: Arc<Permissions>,
         mcp: Arc<McpRegistry>,
+        scripts: Arc<ScriptRunner>,
     ) -> Self {
         Self {
             pipeline: Arc::new(Pipeline::new(router.clone(), memory.clone())),
@@ -33,6 +37,8 @@ impl AppState {
             memory,
             permissions,
             mcp,
+            scripts: scripts.clone(),
+            scheduler: Arc::new(Scheduler::new(scripts)),
             tasks: Arc::new(RwLock::new(HashMap::new())),
         }
     }

@@ -29,6 +29,10 @@ pub fn routes() -> AxumRouter<AppState> {
         .route("/v1/mcp/tools", get(mcp_tools))
         .route("/v1/mcp/call", post(mcp_call))
         .route("/v1/agent/run", post(agent_run))
+        .route("/v1/scripts", get(list_scripts).post(register_script))
+        .route("/v1/scripts/{name}/run", post(run_script))
+        .route("/v1/schedule", get(list_schedule).post(add_schedule).delete(remove_schedule))
+        .route("/v1/schedule/tick", post(tick_scheduler))
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -165,6 +169,83 @@ async fn search_semantic(
         Ok(hits) => Json(json!({ "query": query, "results": hits })),
         Err(e) => Json(json!({ "error": e })),
     }
+}
+
+async fn list_scripts(State(state): State<AppState>) -> Json<serde_json::Value> {
+    Json(json!({ "scripts": state.scripts.list().await }))
+}
+
+async fn register_script(
+    State(state): State<AppState>,
+    Json(spec): Json<b3nbox_core::scripts::ScriptSpec>,
+) -> Json<serde_json::Value> {
+    let check = state.permissions.check("script", Some(&spec.command));
+    if !check.allowed {
+        return Json(json!({ "error": "Verweigert durch Permission-System", "check": check }));
+    }
+    match state.scripts.register(spec).await {
+        Ok(()) => Json(json!({ "status": "registered" })),
+        Err(e) => Json(json!({ "error": e })),
+    }
+}
+
+#[derive(Deserialize)]
+struct RunScriptBody {
+    #[serde(default)]
+    approval: bool,
+}
+
+async fn run_script(
+    State(state): State<AppState>,
+    Path(name): Path<String>,
+    body: Option<Json<RunScriptBody>>,
+) -> Json<serde_json::Value> {
+    let check = state.permissions.check("script", Some(&name));
+    if !check.allowed {
+        return Json(json!({ "error": "Verweigert durch Permission-System", "check": check }));
+    }
+    let approval = body.map(|Json(b)| b.approval).unwrap_or(false);
+    match state.scripts.run(&name, approval).await {
+        Ok(result) => Json(serde_json::to_value(result).unwrap()),
+        Err(e) => Json(json!({ "status": "error", "error": e })),
+    }
+}
+
+async fn list_schedule(State(state): State<AppState>) -> Json<serde_json::Value> {
+    Json(json!({ "schedule": state.scheduler.list().await }))
+}
+
+async fn add_schedule(
+    State(state): State<AppState>,
+    Json(entry): Json<b3nbox_core::scripts::ScheduleEntry>,
+) -> Json<serde_json::Value> {
+    let check = state.permissions.check("schedule", Some(&entry.script));
+    if !check.allowed {
+        return Json(json!({ "error": "Verweigert durch Permission-System", "check": check }));
+    }
+    match state.scheduler.add(entry).await {
+        Ok(()) => Json(json!({ "status": "scheduled" })),
+        Err(e) => Json(json!({ "error": e })),
+    }
+}
+
+async fn remove_schedule(
+    State(state): State<AppState>,
+    axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let Some(name) = params.get("name") else {
+        return Json(json!({ "error": "Parameter 'name' fehlt" }));
+    };
+    if state.scheduler.remove(name).await {
+        Json(json!({ "status": "removed" }))
+    } else {
+        Json(json!({ "error": format!("Schedule '{name}' nicht gefunden") }))
+    }
+}
+
+async fn tick_scheduler(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let executed = state.scheduler.tick().await;
+    Json(json!({ "executed": executed }))
 }
 
 async fn list_permissions(State(state): State<AppState>) -> Json<serde_json::Value> {

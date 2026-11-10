@@ -50,6 +50,7 @@ async fn main() {
             memory: Default::default(),
             permissions: Default::default(),
             mcp: HashMap::new(),
+            scripts: Default::default(),
         }
     });
 
@@ -78,8 +79,22 @@ async fn main() {
         }
     }
 
+    let scripts = Arc::new(b3nbox_core::scripts::ScriptRunner::new(
+        config.scripts.allowed_dirs.clone(),
+        config.scripts.require_approval,
+    ));
+
     let router = Arc::new(CoreRouter::new(build_backends(&config), config.routing.clone()));
-    let app_state = AppState::new(router, memory, permissions, mcp);
+    let app_state = AppState::new(router, memory, permissions, mcp, scripts);
+
+    let scheduler_state = app_state.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+        loop {
+            interval.tick().await;
+            scheduler_state.scheduler.tick().await;
+        }
+    });
 
     let app = axum::Router::new()
         .merge(api::routes())
