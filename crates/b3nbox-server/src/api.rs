@@ -272,7 +272,7 @@ async fn check_permission(State(state): State<AppState>, Json(body): Json<CheckB
     Json(serde_json::to_value(result).unwrap())
 }
 
-fn build_tool_registry(state: &AppState) -> b3nbox_core::agent::ToolRegistry {
+async fn build_tool_registry(state: &AppState) -> b3nbox_core::agent::ToolRegistry {
     use b3nbox_core::agent::{ToolHandler, ToolRegistry, ToolSpec};
     use std::sync::Arc;
 
@@ -292,17 +292,68 @@ fn build_tool_registry(state: &AppState) -> b3nbox_core::agent::ToolRegistry {
                         .unwrap_or_else(|| format!("MCP-Tool {server_name}:{tool_name}")),
                     parameters: serde_json::json!({}),
                 },
-                Arc::new(move |args: &serde_json::Value| {
+                Arc::new(move |args: serde_json::Value| {
+                    let mcp = mcp.clone();
+                    let server_name = server_name.clone();
+                    let tool_name = tool_name.clone();
                     let check = perms.check("mcp_tool", Some(&format!("{server_name}:{tool_name}")));
-                    if !check.allowed {
-                        return Err("Verweigert durch Permission-System".to_string());
-                    }
-                    mcp.call(&server_name, &tool_name, args.clone())
-                        .map_err(|e| e.to_string())
-                        .map(|r| r.to_string())
+                    let fut: b3nbox_core::agent::ToolFuture = Box::pin(async move {
+                        if !check.allowed {
+                            return Err("Verweigert durch Permission-System".to_string());
+                        }
+                        mcp.call(&server_name, &tool_name, args)
+                            .map_err(|e| e.to_string())
+                            .map(|r| r.to_string())
+                    });
+                    fut
                 }) as ToolHandler,
             );
         }
+    }
+
+    let tasks = state.tasks.read().await.clone();
+    for (id, task) in tasks {
+        let prompt = task["prompt"].as_str().unwrap_or_default().to_string();
+        let route = task["route"].as_str().unwrap_or("default").to_string();
+        let router = state.router.clone();
+        let perms = state.permissions.clone();
+        let task_id = id.clone();
+        tools.register(
+            ToolSpec {
+                name: format!("task_{id}"),
+                description: format!(
+                    "Express-Task: {}",
+                    task["name"].as_str().unwrap_or(&task_id)
+                ),
+                parameters: serde_json::json!({}),
+            },
+            Arc::new(move |_args: serde_json::Value| {
+                let router = router.clone();
+                let prompt = prompt.clone();
+                let route = route.clone();
+                let check = perms.check("task", Some(&task_id));
+                let fut: b3nbox_core::agent::ToolFuture = Box::pin(async move {
+                    if !check.allowed {
+                        return Err("Verweigert durch Permission-System".to_string());
+                    }
+                    let request = b3nbox_core::types::ChatRequest {
+                        model: None,
+                        messages: vec![b3nbox_core::types::ChatMessage {
+                            role: "user".into(),
+                            content: prompt,
+                        }],
+                        temperature: Some(0.2),
+                        max_tokens: Some(1024),
+                    };
+                    router
+                        .chat(&request, &route)
+                        .await
+                        .map(|r| r.content)
+                        .map_err(|e| e.to_string())
+                });
+                fut
+            }) as ToolHandler,
+        );
     }
 
     tools
@@ -327,7 +378,7 @@ async fn agent_run(State(state): State<AppState>, Json(body): Json<AgentRunBody>
         max_iterations: body.max_iterations.unwrap_or(8),
         ..Default::default()
     };
-    let tools = build_tool_registry(&state);
+    let tools = build_tool_registry(&state).await;
     match state.agent.run(&body.task, &tools, &config).await {
         Ok(run) => Json(serde_json::to_value(run).unwrap()),
         Err(e) => Json(json!({ "status": "error", "error": e.to_string() })),

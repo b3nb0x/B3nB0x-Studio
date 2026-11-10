@@ -13,7 +13,8 @@ pub struct ToolSpec {
     pub parameters: serde_json::Value,
 }
 
-pub type ToolHandler = Arc<dyn Fn(&serde_json::Value) -> Result<String, String> + Send + Sync>;
+pub type ToolFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Result<String, String>> + Send>>;
+pub type ToolHandler = Arc<dyn Fn(serde_json::Value) -> ToolFuture + Send + Sync>;
 
 pub struct ToolRegistry {
     tools: HashMap<String, (ToolSpec, ToolHandler)>,
@@ -40,11 +41,14 @@ impl ToolRegistry {
         self.tools.values().map(|(spec, _)| spec.clone()).collect()
     }
 
-    pub fn call(&self, name: &str, arguments: &serde_json::Value) -> Result<String, String> {
-        self.tools
+    pub async fn call(&self, name: &str, arguments: serde_json::Value) -> Result<String, String> {
+        let handler = self
+            .tools
             .get(name)
-            .ok_or_else(|| format!("Tool '{name}' nicht registriert"))
-            .and_then(|(_, handler)| handler(arguments))
+            .ok_or_else(|| format!("Tool '{name}' nicht registriert"))?
+            .1
+            .clone();
+        handler(arguments).await
     }
 }
 
@@ -170,7 +174,10 @@ impl AgentLoop {
                     });
                 }
                 AgentDecision::Tool { tool, arguments } => {
-                    let tool_result = tools.call(&tool, &arguments).unwrap_or_else(|e| format!("Tool-Fehler: {e}"));
+                    let tool_result = tools
+                        .call(&tool, arguments.clone())
+                        .await
+                        .unwrap_or_else(|e| format!("Tool-Fehler: {e}"));
                     history.push(ChatMessage {
                         role: "assistant".into(),
                         content: content.to_string(),
@@ -302,7 +309,11 @@ mod tests {
                 description: "Gibt den Text zurück".into(),
                 parameters: serde_json::json!({"text": "string"}),
             },
-            Arc::new(|args| Ok(format!("Echo: {}", args["text"].as_str().unwrap_or("?")))),
+            Arc::new(|args| {
+                Box::pin(async move {
+                    Ok(format!("Echo: {}", args["text"].as_str().unwrap_or("?")))
+                })
+            }),
         );
 
         let agent = AgentLoop::new(router);
@@ -347,7 +358,7 @@ mod tests {
                 description: "Echo".into(),
                 parameters: serde_json::json!({}),
             },
-            Arc::new(|_| Ok("ok".to_string())),
+            Arc::new(|_args| Box::pin(async move { Ok("ok".to_string()) })),
         );
 
         let agent = AgentLoop::new(router);
