@@ -40,6 +40,8 @@ pub struct Config {
     pub audit: AuditConfig,
     #[serde(default)]
     pub guard: crate::guard::GuardConfig,
+    #[serde(default)]
+    pub auth: crate::auth::AuthConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

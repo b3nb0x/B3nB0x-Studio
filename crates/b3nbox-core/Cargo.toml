@@ -22,3 +22,4 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 futures-util = { workspace = true }
 bytes = "1"
 unicode-normalization = "0.1"
+sha2 = "0.10"

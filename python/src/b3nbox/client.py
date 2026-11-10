@@ -6,9 +6,33 @@ class B3nBoxError(Exception):
 
 
 class B3nBoxClient:
-    def __init__(self, base_url: str = "http://127.0.0.1:8300", timeout: float = 120.0):
+    def __init__(
+        self,
+        base_url: str = "http://127.0.0.1:8300",
+        api_key: str | None = None,
+        token: str | None = None,
+        timeout: float = 120.0,
+    ):
         self.base_url = base_url.rstrip("/")
-        self._client = httpx.Client(base_url=self.base_url, timeout=timeout)
+        headers = {}
+        credential = token or api_key
+        if credential:
+            headers["Authorization"] = f"Bearer {credential}"
+        self._client = httpx.Client(base_url=self.base_url, timeout=timeout, headers=headers)
+
+    def login(self, api_key: str) -> dict:
+        """Erzeugt eine Session aus einem API-Key."""
+        resp = self._client.post("/v1/auth/login", json={"key": api_key})
+        data = self._check(resp)
+        if "token" in data:
+            self._client.headers["Authorization"] = f"Bearer {data['token']}"
+        return data
+
+    def logout(self) -> dict:
+        return self._post("/v1/auth/logout", {})
+
+    def me(self) -> dict:
+        return self._get("/v1/auth/me")
 
     def health(self) -> dict:
         return self._get("/health")

@@ -1,6 +1,7 @@
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
+use axum::response::IntoResponse;
 use axum::routing::{get, post, put};
 use axum::{Json, Router as AxumRouter};
 use b3nbox_core::config::RouteTarget;
@@ -39,6 +40,9 @@ pub fn routes() -> AxumRouter<AppState> {
         .route("/v1/sessions/{id}/chat", post(session_chat))
         .route("/v1/audit", get(recent_audit))
         .route("/v1/guard/blocked", get(guard_blocked))
+        .route("/v1/auth/login", post(auth_login))
+        .route("/v1/auth/logout", post(auth_logout))
+        .route("/v1/auth/me", get(auth_me))
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -524,6 +528,115 @@ struct CheckBody {
 async fn check_permission(State(state): State<AppState>, Json(body): Json<CheckBody>) -> Json<serde_json::Value> {
     let result = state.permissions.check(&body.action, body.scope.as_deref());
     Json(serde_json::to_value(result).unwrap())
+}
+
+const EXEMPT_PATHS: &[&str] = &["/", "/health", "/v1/auth/login"];
+
+/// Endpunkte, deren veraendernde Methoden (POST/PUT/DELETE) Admin-Rolle
+/// erfordern.
+const ADMIN_WRITE_PATHS: &[&str] = &[
+    "/v1/permissions",
+    "/v1/scripts",
+    "/v1/schedule",
+    "/v1/rate-limit",
+];
+
+pub async fn auth_middleware(
+    State(state): State<AppState>,
+    mut request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    if !state.auth_enabled() {
+        return next.run(request).await;
+    }
+
+    let path = request.uri().path().to_string();
+    let method = request.method().clone();
+    if EXEMPT_PATHS.contains(&path.as_str())
+        || (method == axum::http::Method::GET && path.starts_with("/v1/permissions/check"))
+    {
+        return next.run(request).await;
+    }
+
+    let token = request
+        .headers()
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .map(|t| t.to_string());
+
+    let Some(token) = token else {
+        return (StatusCode::UNAUTHORIZED, "Missing Authorization: Bearer <token>").into_response();
+    };
+
+    let Some(info) = state.auth.verify(&token) else {
+        return (StatusCode::UNAUTHORIZED, "Ungueltiger Token oder Key").into_response();
+    };
+
+    let is_write = method != axum::http::Method::GET;
+    if is_write && ADMIN_WRITE_PATHS.iter().any(|p| path.starts_with(p)) && !info.is_admin() {
+        return (
+            StatusCode::FORBIDDEN,
+            "Admin-Rolle erforderlich fuer diese Aktion",
+        )
+            .into_response();
+    }
+
+    request.extensions_mut().insert(info);
+    next.run(request).await
+}
+
+#[derive(Deserialize)]
+struct LoginBody {
+    key: String,
+}
+
+async fn auth_login(State(state): State<AppState>, Json(body): Json<LoginBody>) -> (StatusCode, Json<serde_json::Value>) {
+    match state.auth.login(&body.key) {
+        Some(token) => {
+            let info = state
+                .auth
+                .verify(&token)
+                .unwrap_or(b3nbox_core::auth::AuthInfo {
+                    name: String::new(),
+                    role: String::new(),
+                });
+            (
+                StatusCode::OK,
+                Json(json!({ "token": token, "name": info.name, "role": info.role })),
+            )
+        }
+        None => (StatusCode::UNAUTHORIZED, Json(json!({ "error": "Ungueltiger Key" }))),
+    }
+}
+
+async fn auth_logout(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+) -> Json<serde_json::Value> {
+    let token = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "));
+    match token {
+        Some(t) if state.auth.logout(t) => Json(json!({ "status": "logged-out" })),
+        _ => Json(json!({ "status": "no-session" })),
+    }
+}
+
+async fn auth_me(
+    State(state): State<AppState>,
+    headers: axum::http::header::HeaderMap,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let token = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+    match state.auth.verify(token) {
+        Some(info) => Ok(Json(serde_json::to_value(info).unwrap())),
+        None => Err(StatusCode::UNAUTHORIZED),
+    }
 }
 
 async fn build_tool_registry(state: &AppState) -> b3nbox_core::agent::ToolRegistry {

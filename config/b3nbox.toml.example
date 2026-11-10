@@ -126,6 +126,25 @@ mode = "block"
 llm_check = false
 detector_route = "injection-detector"
 
+# --- Authentifizierung ---
+# Key generieren: ./target/release/b3nbox-server --generate-key
+# Es wird NUR der Hash gespeichert, niemals der Key selbst.
+# Rollen: "admin" (alles erlaubt) | "user" (Schreib-Rechte nur ausserhalb
+#         der Admin-Pfade: permissions/scripts/schedule/rate-limit)
+
+[auth]
+enabled = true
+
+[[auth.keys]]
+name = "admin-key"
+role = "admin"
+key_hash = "HIER_DEN_HASH_EINFUEGEN"
+
+# [[auth.keys]]
+# name = "gui-user"
+# role = "user"
+# key_hash = "..."
+
 # Beispiel-Konfiguration fuer den Klassifikator:
 # [routing.injection-detector]
 # backend = "ollama"

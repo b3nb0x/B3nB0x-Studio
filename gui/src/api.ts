@@ -1,10 +1,22 @@
 const BASE = "";
 
+export function getToken(): string | null {
+  return localStorage.getItem("b3nbox_token");
+}
+
+export function setToken(token: string) {
+  localStorage.setItem("b3nbox_token", token);
+}
+
+export function clearToken() {
+  localStorage.removeItem("b3nbox_token");
+}
+
 async function req(path: string, init?: RequestInit): Promise<any> {
-  const resp = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const resp = await fetch(`${BASE}${path}`, { headers, ...init });
   if (!resp.ok) throw new Error(`API-Fehler ${resp.status}: ${await resp.text()}`);
   return resp.json();
 }
@@ -64,4 +76,8 @@ export const api = {
     req(`/v1/sessions/${id}/chat`, { method: "POST", body: JSON.stringify({ message }) }),
   recentAudit: (limit: number) => req(`/v1/audit?limit=${limit}`),
   guardBlocked: () => req("/v1/guard/blocked"),
+  login: (key: string) =>
+    req("/v1/auth/login", { method: "POST", body: JSON.stringify({ key }) }),
+  logout: () => req("/v1/auth/logout", { method: "POST", body: "{}" }),
+  me: () => req("/v1/auth/me"),
 };

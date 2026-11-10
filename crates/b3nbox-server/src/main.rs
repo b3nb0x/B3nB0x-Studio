@@ -36,7 +36,25 @@ async fn main() {
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .init();
 
-    let config_path = std::env::args().nth(1).unwrap_or_else(|| "config/b3nbox.toml".into());
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--generate-key") {
+        let (key, hash) = b3nbox_core::auth::generate_key();
+        println!("API-Key:  {key}");
+        println!("Hash:     {hash}");
+        println!("\nIn config/b3nbox.toml eintragen:");
+        println!("[auth]");
+        println!("enabled = true");
+        println!("[[auth.keys]]");
+        println!("name = \"mein-key\"");
+        println!("role = \"admin\"");
+        println!("key_hash = \"{hash}\"");
+        return;
+    }
+    let config_path = args
+        .get(1)
+        .filter(|a| !a.starts_with("--"))
+        .cloned()
+        .unwrap_or_else(|| "config/b3nbox.toml".into());
     let config = Config::load(&config_path).unwrap_or_else(|e| {
         tracing::warn!("Konfiguration '{config_path}' nicht ladbar ({e}) - verwende Standardwerte");
         Config {
@@ -54,6 +72,7 @@ async fn main() {
             sessions: Default::default(),
             audit: Default::default(),
             guard: Default::default(),
+            auth: Default::default(),
         }
     });
 
@@ -125,11 +144,26 @@ async fn main() {
     let guard = Arc::new(
         b3nbox_core::guard::Guard::new(config.guard.clone()).with_router(router.clone()),
     );
+
+    let auth = match b3nbox_core::auth::Auth::new(&config.auth) {
+        Ok(auth) => Arc::new(auth),
+        Err(e) => {
+            tracing::error!("Auth-Konfiguration ungueltig: {e}");
+            return;
+        }
+    };
+    if auth.is_enabled() {
+        tracing::info!("Auth aktiv ({} Keys, {} Sessions aktiv)", config.auth.keys.len(), auth.session_count());
+    } else {
+        tracing::warn!("Auth DEAKTIVIERT - der Server akzeptiert unauthentifizierte Requests");
+    }
     tracing::info!(
         "Injection-Guard aktiv (Modus: {})",
         if config.guard.mode == b3nbox_core::guard::GuardMode::Block { "block" } else { "log-only" }
     );
 
+    let app_state_clone = std::sync::Arc::new(());
+    let _ = app_state_clone;
     let app_state = AppState::new(
         router,
         state::Components {
@@ -140,6 +174,7 @@ async fn main() {
             sessions,
             audit,
             guard,
+            auth,
         },
     );
 
@@ -154,6 +189,10 @@ async fn main() {
 
     let app = axum::Router::new()
         .merge(api::routes())
+        .layer(axum::middleware::from_fn_with_state(
+            app_state.clone(),
+            api::auth_middleware,
+        ))
         .with_state(app_state)
         .route("/", get(|| async { axum::Json(serde_json::json!({ "service": "B3nBox Studio LLM Manager", "docs": "/v1/models, /v1/chat, /v1/routing, /v1/pipeline, /v1/tasks" })) }));
 

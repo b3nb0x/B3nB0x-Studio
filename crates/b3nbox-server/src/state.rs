@@ -1,4 +1,5 @@
 use b3nbox_core::agent::AgentLoop;
+use b3nbox_core::auth::Auth;
 use b3nbox_core::mcp::McpRegistry;
 use b3nbox_core::guard::Guard;
 use b3nbox_core::memory::MemoryLayer;
@@ -24,6 +25,7 @@ pub struct AppState {
     pub sessions: Option<Arc<SessionStore>>,
     pub audit: Option<Arc<b3nbox_core::audit::AuditLog>>,
     pub guard: Arc<Guard>,
+    pub auth: Arc<Auth>,
     pub tasks: Arc<RwLock<HashMap<String, serde_json::Value>>>,
 }
 
@@ -35,9 +37,14 @@ pub struct Components {
     pub sessions: Option<Arc<SessionStore>>,
     pub audit: Option<Arc<b3nbox_core::audit::AuditLog>>,
     pub guard: Arc<Guard>,
+    pub auth: Arc<Auth>,
 }
 
 impl AppState {
+    pub fn auth_enabled(&self) -> bool {
+        self.auth.is_enabled()
+    }
+
     pub fn new(router: Arc<Router>, components: Components) -> Self {
         let Components {
             memory,
@@ -47,6 +54,7 @@ impl AppState {
             sessions,
             audit,
             guard,
+            auth,
         } = components;
         Self {
             pipeline: Arc::new(Pipeline::new(router.clone(), memory.clone(), guard.clone())),
@@ -60,6 +68,7 @@ impl AppState {
             sessions,
             audit,
             guard,
+            auth,
             tasks: Arc::new(RwLock::new(HashMap::new())),
         }
     }
