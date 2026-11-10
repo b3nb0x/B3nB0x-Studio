@@ -233,11 +233,42 @@ impl LlmBackend for LmStudioAdapter {
 
 pub struct NativeAdapter {
     pub model_path: Option<String>,
+    #[cfg(feature = "native-inference")]
+    pool: std::sync::OnceLock<std::sync::Arc<crate::native::NativeEnginePool>>,
+    #[cfg(feature = "native-inference")]
+    ctx_size: u32,
 }
 
 impl NativeAdapter {
     pub fn new(model_path: Option<String>) -> Self {
-        Self { model_path }
+        Self {
+            model_path: model_path.clone(),
+            #[cfg(feature = "native-inference")]
+            pool: std::sync::OnceLock::new(),
+            #[cfg(feature = "native-inference")]
+            ctx_size: 4096,
+        }
+    }
+
+    #[cfg(feature = "native-inference")]
+    fn ensure_loaded(&self) -> Option<std::sync::Arc<crate::native::NativeEnginePool>> {
+        let path = self.model_path.as_ref()?;
+        let pool = self
+            .pool
+            .get_or_init(|| std::sync::Arc::new(crate::native::NativeEnginePool::new()));
+        if !pool.loaded_models().iter().any(|p| p == path) {
+            match crate::native::NativeEngine::load(path, self.ctx_size) {
+                Ok(engine) => {
+                    if let Err(e) = pool.register(engine, path) {
+                        tracing::error!("Native-Modell '{path}' Ladefehler: {e}");
+                    } else {
+                        tracing::info!("Native-Modell geladen: {path}");
+                    }
+                }
+                Err(e) => tracing::error!("Native-Modell '{path}' Ladefehler: {e}"),
+            }
+        }
+        Some(std::sync::Arc::clone(pool))
     }
 }
 
@@ -247,14 +278,41 @@ impl LlmBackend for NativeAdapter {
         "b3nbox-native"
     }
 
-    async fn chat(&self, _request: &ChatRequest, _model: &str) -> Result<ChatResponse, BackendError> {
-        match &self.model_path {
-            None => Err(BackendError::NotConfigured(
-                "b3nbox-native: kein GGUF-Modell konfiguriert (Phase 2: llama-cpp-2-Bindings)".into(),
-            )),
-            Some(path) => Err(BackendError::NotConfigured(format!(
-                "b3nbox-native: Inferenz-Engine noch nicht angebunden (Modell: {path})"
-            ))),
+    async fn chat(&self, request: &ChatRequest, model: &str) -> Result<ChatResponse, BackendError> {
+        let Some(model_path) = &self.model_path else {
+            return Err(BackendError::NotConfigured(
+                "b3nbox-native: kein GGUF-Modell (model_path) konfiguriert".into(),
+            ));
+        };
+
+        #[cfg(not(feature = "native-inference"))]
+        {
+            let _ = (request, model);
+            return Err(BackendError::NotConfigured(format!(
+                "b3nbox-native: Feature 'native-inference' nicht aktiviert (Modell: {model_path})"
+            )));
+        }
+
+        #[cfg(feature = "native-inference")]
+        {
+            let Some(pool) = self.ensure_loaded() else {
+                return Err(BackendError::NotConfigured(
+                    "b3nbox-native: Engine-Pool nicht initialisiert".into(),
+                ));
+            };
+            let prompt = crate::native::chatml_prompt(&request.messages);
+            let max_tokens = request.max_tokens.unwrap_or(1024);
+            let start = std::time::Instant::now();
+            let result = tokio::task::block_in_place(|| {
+                pool.complete(model_path, &prompt, max_tokens)
+            });
+            let content = result.map_err(|e| BackendError::Api("b3nbox-native".into(), e))?;
+            return Ok(ChatResponse {
+                backend: "b3nbox-native".into(),
+                model: model.to_string(),
+                content,
+                duration_ms: start.elapsed().as_millis() as u64,
+            });
         }
     }
 
@@ -262,10 +320,12 @@ impl LlmBackend for NativeAdapter {
         Ok(self
             .model_path
             .as_ref()
-            .map(|p| vec![ModelInfo {
-                id: p.clone(),
-                backend: "b3nbox-native".into(),
-            }])
+            .map(|p| {
+                vec![ModelInfo {
+                    id: p.clone(),
+                    backend: "b3nbox-native".into(),
+                }]
+            })
             .unwrap_or_default())
     }
 

@@ -1,6 +1,8 @@
 pub mod adapters;
 pub mod backend;
 pub mod config;
+#[cfg(feature = "native-inference")]
+pub mod native;
 pub mod pipeline;
 pub mod router;
 pub mod types;

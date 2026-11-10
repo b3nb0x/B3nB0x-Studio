@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+native-inference = ["b3nbox-core/native-inference"]
+
 [dependencies]
 b3nbox-core = { path = "../b3nbox-core" }
 tokio = { workspace = true }

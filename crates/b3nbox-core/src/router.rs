@@ -62,11 +62,10 @@ impl Router {
         route_key: &str,
         fallbacks: &[(&str, &str)],
     ) -> Result<ChatResponse, BackendError> {
-        let mut last_err = None;
-        match self.chat(request, route_key).await {
+        let last_err = match self.chat(request, route_key).await {
             Ok(resp) => return Ok(resp),
-            Err(e) => last_err = Some(e),
-        }
+            Err(e) => e,
+        };
         for (backend, model) in fallbacks {
             if let Some(b) = self.backends.get(*backend) {
                 if let Ok(resp) = b.chat(request, model).await {
