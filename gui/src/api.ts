@@ -55,4 +55,12 @@ export const api = {
     req(`/v1/schedule?name=${encodeURIComponent(name)}`, { method: "DELETE" }),
   searchSemantic: (q: string) =>
     req(`/v1/memory/search-semantic?q=${encodeURIComponent(q)}`, { method: "POST" }),
+  listSessions: () => req("/v1/sessions"),
+  createSession: (name: string) =>
+    req("/v1/sessions", { method: "POST", body: JSON.stringify({ name }) }),
+  getSession: (id: string) => req(`/v1/sessions/${id}`),
+  deleteSession: (id: string) => req(`/v1/sessions/${id}`, { method: "DELETE" }),
+  sessionChat: (id: string, message: string) =>
+    req(`/v1/sessions/${id}/chat`, { method: "POST", body: JSON.stringify({ message }) }),
+  recentAudit: (limit: number) => req(`/v1/audit?limit=${limit}`),
 };

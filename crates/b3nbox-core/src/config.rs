@@ -36,6 +36,8 @@ pub struct Config {
     pub scripts: ScriptsConfig,
     #[serde(default)]
     pub sessions: SessionsConfig,
+    #[serde(default)]
+    pub audit: AuditConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,4 +142,29 @@ impl Config {
         let raw = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
         toml::from_str(&raw).map_err(|e| e.to_string())
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditConfig {
+    #[serde(default = "default_audit_db")]
+    pub db_path: String,
+    #[serde(default = "default_audit_enabled")]
+    pub enabled: bool,
+}
+
+impl Default for AuditConfig {
+    fn default() -> Self {
+        Self {
+            db_path: default_audit_db(),
+            enabled: default_audit_enabled(),
+        }
+    }
+}
+
+fn default_audit_db() -> String {
+    "data/b3nbox-audit.db".into()
+}
+
+fn default_audit_enabled() -> bool {
+    true
 }

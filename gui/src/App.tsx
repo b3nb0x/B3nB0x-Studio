@@ -8,8 +8,21 @@ import Permissions from "./pages/Permissions";
 import Mcp from "./pages/Mcp";
 import Agent from "./pages/Agent";
 import Scripts from "./pages/Scripts";
+import Sessions from "./pages/Sessions";
+import Audit from "./pages/Audit";
 
-type Page = "dashboard" | "routing" | "pipeline" | "tasks" | "memory" | "permissions" | "mcp" | "agent" | "scripts";
+type Page =
+  | "dashboard"
+  | "routing"
+  | "pipeline"
+  | "tasks"
+  | "memory"
+  | "permissions"
+  | "mcp"
+  | "agent"
+  | "scripts"
+  | "sessions"
+  | "audit";
 
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard");
@@ -24,6 +37,8 @@ export default function App() {
     { key: "mcp", label: "MCP-Tools" },
     { key: "agent", label: "Agent" },
     { key: "scripts", label: "Skripte" },
+    { key: "sessions", label: "Sessions" },
+    { key: "audit", label: "Audit" },
   ];
 
   return (
@@ -59,6 +74,8 @@ export default function App() {
         {page === "mcp" && <Mcp />}
         {page === "agent" && <Agent />}
         {page === "scripts" && <Scripts />}
+        {page === "sessions" && <Sessions />}
+        {page === "audit" && <Audit />}
       </main>
     </div>
   );

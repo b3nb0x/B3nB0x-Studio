@@ -37,6 +37,7 @@ pub fn routes() -> AxumRouter<AppState> {
         .route("/v1/sessions", get(list_sessions).post(create_session))
         .route("/v1/sessions/{id}", get(get_session).delete(delete_session))
         .route("/v1/sessions/{id}/chat", post(session_chat))
+        .route("/v1/audit", get(recent_audit))
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -222,6 +223,20 @@ async fn search_semantic(
     };
     match memory.search_similar(&query_vec, limit) {
         Ok(hits) => Json(json!({ "query": query, "results": hits })),
+        Err(e) => Json(json!({ "error": e })),
+    }
+}
+
+async fn recent_audit(
+    State(state): State<AppState>,
+    axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let Some(audit) = &state.audit else {
+        return Json(json!({ "error": "Audit-Log nicht aktiviert" }));
+    };
+    let limit = params.get("limit").and_then(|l| l.parse::<u32>().ok()).unwrap_or(20);
+    match audit.recent(limit) {
+        Ok(entries) => Json(json!({ "entries": entries })),
         Err(e) => Json(json!({ "error": e })),
     }
 }

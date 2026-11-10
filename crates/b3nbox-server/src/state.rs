@@ -21,6 +21,7 @@ pub struct AppState {
     pub scripts: Arc<ScriptRunner>,
     pub scheduler: Arc<Scheduler>,
     pub sessions: Option<Arc<SessionStore>>,
+    pub audit: Option<Arc<b3nbox_core::audit::AuditLog>>,
     pub tasks: Arc<RwLock<HashMap<String, serde_json::Value>>>,
 }
 
@@ -32,6 +33,7 @@ impl AppState {
         mcp: Arc<McpRegistry>,
         scripts: Arc<ScriptRunner>,
         sessions: Option<Arc<SessionStore>>,
+        audit: Option<Arc<b3nbox_core::audit::AuditLog>>,
     ) -> Self {
         Self {
             pipeline: Arc::new(Pipeline::new(router.clone(), memory.clone())),
@@ -43,6 +45,7 @@ impl AppState {
             scripts: scripts.clone(),
             scheduler: Arc::new(Scheduler::new(scripts)),
             sessions,
+            audit,
             tasks: Arc::new(RwLock::new(HashMap::new())),
         }
     }

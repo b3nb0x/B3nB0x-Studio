@@ -1,5 +1,6 @@
 pub mod agent;
 pub mod adapters;
+pub mod audit;
 pub mod backend;
 pub mod config;
 pub mod embeddings;

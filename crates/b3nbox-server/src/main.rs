@@ -52,6 +52,7 @@ async fn main() {
             mcp: HashMap::new(),
             scripts: Default::default(),
             sessions: Default::default(),
+            audit: Default::default(),
         }
     });
 
@@ -100,8 +101,27 @@ async fn main() {
         None
     };
 
-    let router = Arc::new(CoreRouter::new(build_backends(&config), config.routing.clone()));
-    let app_state = AppState::new(router, memory, permissions, mcp, scripts, sessions);
+    let audit = if config.audit.enabled {
+        match b3nbox_core::audit::AuditLog::open(&config.audit.db_path) {
+            Ok(log) => {
+                tracing::info!("Audit-Log aktiv: {}", config.audit.db_path);
+                Some(Arc::new(log))
+            }
+            Err(e) => {
+                tracing::warn!("Audit-Log deaktiviert ({e})");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    let mut core_router = CoreRouter::new(build_backends(&config), config.routing.clone());
+    if let Some(audit) = &audit {
+        core_router = core_router.with_audit(audit.clone());
+    }
+    let router = Arc::new(core_router);
+    let app_state = AppState::new(router, memory, permissions, mcp, scripts, sessions, audit);
 
     let scheduler_state = app_state.clone();
     tokio::spawn(async move {

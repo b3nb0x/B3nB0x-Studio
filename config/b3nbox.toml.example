@@ -103,3 +103,13 @@ mode = "default-allow"
 [scripts]
 allowed_dirs = ["scripts"]
 require_approval = true
+
+# --- Sessions & Audit ---
+
+[sessions]
+enabled = true
+db_path = "data/b3nbox-sessions.db"
+
+[audit]
+enabled = true
+db_path = "data/b3nbox-audit.db"

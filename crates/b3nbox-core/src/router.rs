@@ -8,6 +8,7 @@ use tokio::sync::RwLock;
 pub struct Router {
     backends: HashMap<String, Arc<dyn LlmBackend>>,
     routing: RwLock<HashMap<String, RouteTarget>>,
+    audit: Option<std::sync::Arc<crate::audit::AuditLog>>,
 }
 
 impl Router {
@@ -18,7 +19,13 @@ impl Router {
         Self {
             backends,
             routing: RwLock::new(routing),
+            audit: None,
         }
+    }
+
+    pub fn with_audit(mut self, audit: std::sync::Arc<crate::audit::AuditLog>) -> Self {
+        self.audit = Some(audit);
+        self
     }
 
     pub async fn routes(&self) -> HashMap<String, RouteTarget> {
@@ -47,8 +54,31 @@ impl Router {
             .await
             .ok_or_else(|| BackendError::Api("router".into(), format!("Keine Route für '{route_key}' konfiguriert")))?;
 
+        let prompt = request
+            .messages
+            .iter()
+            .map(|m| m.content.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
         if let Some(backend) = self.backends.get(&target.backend) {
-            return backend.chat(request, &target.model).await;
+            let start = std::time::Instant::now();
+            let result = backend.chat(request, &target.model).await;
+            if let Some(audit) = &self.audit {
+                let (status, response, duration_ms) = match &result {
+                    Ok(resp) => ("ok", resp.content.clone(), resp.duration_ms),
+                    Err(e) => ("error", e.to_string(), start.elapsed().as_millis() as u64),
+                };
+                let _ = audit.log(
+                    route_key,
+                    &target.backend,
+                    &target.model,
+                    duration_ms,
+                    status,
+                    &prompt,
+                    &response,
+                );
+            }
+            return result;
         }
         Err(BackendError::NotConfigured(format!(
             "Backend '{}' der Route '{}' existiert nicht",

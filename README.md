@@ -117,6 +117,11 @@ print(scheduler.execute_reboot(dry_run=True))  # kein echter Reboot
 | POST | `/v1/scripts/{name}/run` | Skript ausführen (`approval`-Flag) |
 | GET/POST/DELETE | `/v1/schedule` | Schedules listen / anlegen / entfernen |
 | POST | `/v1/schedule/tick` | Scheduler-Tick manuell auslösen |
+| GET/POST | `/v1/sessions` | Sessions listen / anlegen |
+| GET/DELETE | `/v1/sessions/{id}` | Session-Historie / Session löschen |
+| POST | `/v1/sessions/{id}/chat` | Chat mit Session-Kontext (Historie) |
+| POST | `/v1/chat/stream` | Chat als SSE-Stream |
+| GET | `/v1/audit` | Audit-Log (letzte LLM-Interaktionen) |
 
 ### Native Inferenz (GGUF direkt im Server)
 
@@ -133,7 +138,7 @@ cargo build --release --features b3nbox-server/native-inference
 
 ## Roadmap
 
-- **Phase 4**: KV-Cache-Reuse für Native-Inferenz, Plugin-/Persona-System, Session-Management, Streaming (SSE), Agent-Tools für Express-Tasks
+- **Phase 5**: KV-Cache-Reuse für Native-Inferenz, Plugin-/Persona-System, WebSocket-Live-Events, Multi-User
 - Einfluss-Quellen: Openclaw (Personas/Plugins), Hermes (Tool-Orchestrierung), Opencode (Session-Management), Claude Code (Plan Mode, Permissions)
 
 ## Lizenz
