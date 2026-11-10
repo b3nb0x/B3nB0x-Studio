@@ -76,6 +76,24 @@ async fn chat(
             Json(json!({ "error": "Verweigert durch Permission-System", "check": check })),
         ));
     }
+    for message in &body.request.messages {
+        if message.role == "user" {
+            let verdict = state
+                .guard
+                .scan(&message.content, b3nbox_core::guard::GuardContext::UserInput);
+            if verdict.blocked {
+                return Err((
+                    StatusCode::FORBIDDEN,
+                    Json(json!({
+                        "error": format!(
+                            "Nachricht vom Guard blockiert: {}",
+                            verdict.reason.unwrap_or_default()
+                        )
+                    })),
+                ));
+            }
+        }
+    }
     match state.router.chat(&body.request, &route).await {
         Ok(resp) => Ok(Json(serde_json::to_value(resp).unwrap())),
         Err(e) => Err((StatusCode::BAD_GATEWAY, Json(json!({ "error": e.to_string() })))),
@@ -96,6 +114,24 @@ async fn chat_stream(
             StatusCode::FORBIDDEN,
             Json(json!({ "error": "Verweigert durch Permission-System" })),
         ));
+    }
+    for message in &body.request.messages {
+        if message.role == "user" {
+            let verdict = state
+                .guard
+                .scan(&message.content, b3nbox_core::guard::GuardContext::UserInput);
+            if verdict.blocked {
+                return Err((
+                    StatusCode::FORBIDDEN,
+                    Json(json!({
+                        "error": format!(
+                            "Nachricht vom Guard blockiert: {}",
+                            verdict.reason.unwrap_or_default()
+                        )
+                    })),
+                ));
+            }
+        }
     }
 
     let Some(target) = state.router.route_for(&route).await else {
@@ -320,6 +356,18 @@ async fn session_chat(
     let check = state.permissions.check("chat", body.route.as_deref());
     if !check.allowed {
         return Json(json!({ "error": "Verweigert durch Permission-System", "check": check }));
+    }
+
+    let input_verdict = state
+        .guard
+        .scan(&body.message, b3nbox_core::guard::GuardContext::UserInput);
+    if input_verdict.blocked {
+        return Json(json!({
+            "error": format!(
+                "Nachricht vom Guard blockiert: {}",
+                input_verdict.reason.unwrap_or_default()
+            )
+        }));
     }
 
     let history = match sessions.history(&id) {
@@ -658,6 +706,18 @@ async fn add_memory(State(state): State<AppState>, Json(body): Json<AddMemoryBod
     let Some(memory) = &state.memory else {
         return Json(json!({ "error": "Memory-Layer nicht aktiviert" }));
     };
+    let memory_verdict = state
+        .guard
+        .scan(&body.content, b3nbox_core::guard::GuardContext::Memory);
+    if memory_verdict.blocked {
+        return Json(json!({
+            "error": format!(
+                "Memory-Eintrag vom Guard blockiert: {}",
+                memory_verdict.reason.unwrap_or_default()
+            )
+        }));
+    }
+
     if body.embed {
         if let Some(route) = state.router.route_for("embeddings").await {
             if let Some(backend) = state.router.backend(&route.backend) {

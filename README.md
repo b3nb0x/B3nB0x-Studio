@@ -122,6 +122,16 @@ print(scheduler.execute_reboot(dry_run=True))  # kein echter Reboot
 | POST | `/v1/sessions/{id}/chat` | Chat mit Session-Kontext (Historie) |
 | POST | `/v1/chat/stream` | Chat als SSE-Stream |
 | GET | `/v1/audit` | Audit-Log (letzte LLM-Interaktionen) |
+| GET | `/v1/guard/blocked` | Injection-Guard: Config + Block-Log |
+
+## Prompt-Injection-Schutz
+
+Der Agent ist mehrschichtig gegen Prompt-Injection gehärtet:
+
+1. **Guard-Scanner** (`[guard]` in der Config): 30+ Signaturen (DE/EN), Unicode-Normalisierung, Homoglyph- und Zero-Width-Evasion-Schutz, Modi `block`/`log-only`
+2. **Strukturelle Isolation**: Tool-Outputs werden als reine Daten ummantelt, Role-Marker und Decision-Fakes neutralisiert, gehärteter System-Prompt
+3. **Argument-Validierung**: LLM-generierte Tool-Argumente werden auf Shell-Metazeichen und Pfad-Traversal geprüft, Skript-Registrierungen ebenso
+4. **Defense in Depth**: Selbst bei Durchbruch begrenzt das Permission-System den Schadensradius; jeder Block landet im Guard-Log und Audit-Log
 
 ### Native Inferenz (GGUF direkt im Server)
 

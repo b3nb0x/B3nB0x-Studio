@@ -49,7 +49,7 @@ impl AppState {
             guard,
         } = components;
         Self {
-            pipeline: Arc::new(Pipeline::new(router.clone(), memory.clone())),
+            pipeline: Arc::new(Pipeline::new(router.clone(), memory.clone(), guard.clone())),
             agent: Arc::new(AgentLoop::new(router.clone(), guard.clone())),
             router,
             memory,
