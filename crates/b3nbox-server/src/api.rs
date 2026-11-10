@@ -80,7 +80,8 @@ async fn chat(
         if message.role == "user" {
             let verdict = state
                 .guard
-                .scan(&message.content, b3nbox_core::guard::GuardContext::UserInput);
+                .scan(&message.content, b3nbox_core::guard::GuardContext::UserInput)
+                .await;
             if verdict.blocked {
                 return Err((
                     StatusCode::FORBIDDEN,
@@ -119,7 +120,8 @@ async fn chat_stream(
         if message.role == "user" {
             let verdict = state
                 .guard
-                .scan(&message.content, b3nbox_core::guard::GuardContext::UserInput);
+                .scan(&message.content, b3nbox_core::guard::GuardContext::UserInput)
+                .await;
             if verdict.blocked {
                 return Err((
                     StatusCode::FORBIDDEN,
@@ -360,7 +362,8 @@ async fn session_chat(
 
     let input_verdict = state
         .guard
-        .scan(&body.message, b3nbox_core::guard::GuardContext::UserInput);
+        .scan(&body.message, b3nbox_core::guard::GuardContext::UserInput)
+        .await;
     if input_verdict.blocked {
         return Json(json!({
             "error": format!(
@@ -708,7 +711,8 @@ async fn add_memory(State(state): State<AppState>, Json(body): Json<AddMemoryBod
     };
     let memory_verdict = state
         .guard
-        .scan(&body.content, b3nbox_core::guard::GuardContext::Memory);
+        .scan(&body.content, b3nbox_core::guard::GuardContext::Memory)
+        .await;
     if memory_verdict.blocked {
         return Json(json!({
             "error": format!(

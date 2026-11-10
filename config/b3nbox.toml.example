@@ -121,4 +121,12 @@ db_path = "data/b3nbox-audit.db"
 [guard]
 enabled = true
 mode = "block"
+# LLM-Klassifikator als Zweitmeinung bei Scanner-Verdacht (Schicht 4)
+# Benoetigt Route 'injection-detector' (kleines, schnelles Modell)
 llm_check = false
+detector_route = "injection-detector"
+
+# Beispiel-Konfiguration fuer den Klassifikator:
+# [routing.injection-detector]
+# backend = "ollama"
+# model = "llama3.2:3b"

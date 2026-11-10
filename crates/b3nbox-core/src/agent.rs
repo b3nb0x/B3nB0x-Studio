@@ -133,7 +133,7 @@ impl AgentLoop {
         let run_id = Uuid::new_v4().to_string();
         let mut steps = Vec::new();
 
-        let input_verdict = self.guard.scan(task, crate::guard::GuardContext::UserInput);
+        let input_verdict = self.guard.scan(task, crate::guard::GuardContext::UserInput).await;
         if input_verdict.blocked {
             return Ok(AgentRun {
                 id: run_id,
@@ -199,7 +199,7 @@ impl AgentLoop {
                     });
                 }
                 AgentDecision::Tool { tool, arguments } => {
-                    let raw_result = match self.guard.validate_tool_arguments(&tool, &arguments) {
+                    let raw_result = match self.guard.validate_tool_arguments(&tool, &arguments).await {
                         Err(reason) => format!("Tool-Fehler: {reason}"),
                         Ok(()) => tools
                             .call(&tool, arguments.clone())
@@ -207,7 +207,7 @@ impl AgentLoop {
                             .unwrap_or_else(|e| format!("Tool-Fehler: {e}")),
                     };
 
-                    let output_verdict = self.guard.scan(&raw_result, crate::guard::GuardContext::ToolOutput);
+                    let output_verdict = self.guard.scan(&raw_result, crate::guard::GuardContext::ToolOutput).await;
                     let tool_result = if output_verdict.blocked {
                         format!(
                             "[GUARD: Tool-Ergebnis blockiert - moeglicher Injektionsversuch: {}]",

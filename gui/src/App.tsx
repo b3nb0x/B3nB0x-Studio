@@ -10,6 +10,7 @@ import Agent from "./pages/Agent";
 import Scripts from "./pages/Scripts";
 import Sessions from "./pages/Sessions";
 import Audit from "./pages/Audit";
+import Guard from "./pages/Guard";
 
 type Page =
   | "dashboard"
@@ -22,7 +23,8 @@ type Page =
   | "agent"
   | "scripts"
   | "sessions"
-  | "audit";
+  | "audit"
+  | "guard";
 
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard");
@@ -39,6 +41,7 @@ export default function App() {
     { key: "scripts", label: "Skripte" },
     { key: "sessions", label: "Sessions" },
     { key: "audit", label: "Audit" },
+    { key: "guard", label: "Guard" },
   ];
 
   return (
@@ -76,6 +79,7 @@ export default function App() {
         {page === "scripts" && <Scripts />}
         {page === "sessions" && <Sessions />}
         {page === "audit" && <Audit />}
+        {page === "guard" && <Guard />}
       </main>
     </div>
   );

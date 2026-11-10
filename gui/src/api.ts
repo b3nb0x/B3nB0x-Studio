@@ -63,4 +63,5 @@ export const api = {
   sessionChat: (id: string, message: string) =>
     req(`/v1/sessions/${id}/chat`, { method: "POST", body: JSON.stringify({ message }) }),
   recentAudit: (limit: number) => req(`/v1/audit?limit=${limit}`),
+  guardBlocked: () => req("/v1/guard/blocked"),
 };

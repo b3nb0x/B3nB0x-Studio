@@ -122,7 +122,9 @@ async fn main() {
         core_router = core_router.with_audit(audit.clone());
     }
     let router = Arc::new(core_router);
-    let guard = Arc::new(b3nbox_core::guard::Guard::new(config.guard.clone()));
+    let guard = Arc::new(
+        b3nbox_core::guard::Guard::new(config.guard.clone()).with_router(router.clone()),
+    );
     tracing::info!(
         "Injection-Guard aktiv (Modus: {})",
         if config.guard.mode == b3nbox_core::guard::GuardMode::Block { "block" } else { "log-only" }

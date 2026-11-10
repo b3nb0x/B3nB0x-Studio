@@ -76,22 +76,19 @@ impl Pipeline {
         let mut context = task.to_string();
         if let Some(memory) = &self.memory {
             if let Ok(hits) = memory.search(task, 5) {
-                let safe_hits: Vec<_> = hits
-                    .iter()
-                    .filter(|m| {
-                        let verdict = self.guard.scan(&m.content, crate::guard::GuardContext::Memory);
-                        if verdict.blocked {
-                            tracing::warn!(
-                                "Memory-Eintrag '{}' gefiltert: {}",
-                                m.key,
-                                verdict.reason.unwrap_or_default()
-                            );
-                            false
-                        } else {
-                            true
-                        }
-                    })
-                    .collect();
+                let mut safe_hits = Vec::new();
+                for m in &hits {
+                    let verdict = self.guard.scan(&m.content, crate::guard::GuardContext::Memory).await;
+                    if verdict.blocked {
+                        tracing::warn!(
+                            "Memory-Eintrag '{}' gefiltert: {}",
+                            m.key,
+                            verdict.reason.unwrap_or_default()
+                        );
+                        continue;
+                    }
+                    safe_hits.push(m.clone());
+                }
                 if !safe_hits.is_empty() {
                     let memory_block = safe_hits
                         .iter()
