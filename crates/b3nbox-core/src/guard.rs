@@ -359,24 +359,42 @@ impl Guard {
     }
 }
 
+/// Aktuelles UTC-Datum/-Zeit als "YYYY-MM-DD HH:MM:SS".
+/// Korrekte Zivilkalender-Umrechnung (Howard Hinnants days_from_civil,
+/// invers angewendet) - ohne chrono-Abhaengigkeit.
 fn chrono_free_now() -> String {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| {
-            let secs = d.as_secs();
-            let days = secs / 86400;
-            let time = secs % 86400;
-            format!(
-                "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
-                1970 + days / 365,
-                1 + (days % 365) / 30,
-                1 + (days % 365) % 30,
-                time / 3600,
-                (time % 3600) / 60,
-                time % 60
-            )
-        })
+        .map(|d| format_epoch(d.as_secs()))
         .unwrap_or_else(|_| "unbekannt".into())
+}
+
+/// Unix-Sekunden -> "YYYY-MM-DD HH:MM:SS" (UTC).
+pub(crate) fn format_epoch(secs: u64) -> String {
+    let days = (secs / 86400) as i64;
+    let time = secs % 86400;
+
+    // civil_from_days: Unix-Tage -> (Jahr, Monat, Tag), proleptisch gregorianisch
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097); // [0, 146096]
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365; // [0, 399]
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); // [0, 365]
+    let mp = (5 * doy + 2) / 153; // [0, 11]
+    let day = doy - (153 * mp + 2) / 5 + 1; // [1, 31]
+    let month = if mp < 10 { mp + 3 } else { mp - 9 }; // [1, 12]
+    let year = if month <= 2 { y + 1 } else { y };
+
+    format!(
+        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+        year,
+        month,
+        day,
+        time / 3600,
+        (time % 3600) / 60,
+        time % 60
+    )
 }
 
 #[cfg(test)]
@@ -386,6 +404,18 @@ mod tests {
 
     fn guard() -> Guard {
         Guard::new(GuardConfig::default())
+    }
+
+    #[test]
+    fn timestamp_matches_known_dates() {
+        // 2026-11-10 12:00:00 UTC
+        assert_eq!(format_epoch(1_794_312_000), "2026-11-10 12:00:00");
+        // Epoch-Start
+        assert_eq!(format_epoch(0), "1970-01-01 00:00:00");
+        // Schalttag 2024-02-29
+        assert_eq!(format_epoch(1_709_164_800), "2024-02-29 00:00:00");
+        // Jahreswechsel 2000-01-01
+        assert_eq!(format_epoch(946_684_800), "2000-01-01 00:00:00");
     }
 
     #[tokio::test]
