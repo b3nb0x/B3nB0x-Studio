@@ -544,6 +544,8 @@ const ADMIN_WRITE_PATHS: &[&str] = &[
     "/v1/schedule",
     "/v1/rate-limit",
     "/v1/mcp",
+    "/v1/routing",
+    "/v1/pipeline",
 ];
 
 pub async fn auth_middleware(
@@ -643,6 +645,14 @@ struct LoginBody {
 }
 
 async fn auth_login(State(state): State<AppState>, Json(body): Json<LoginBody>) -> (StatusCode, Json<serde_json::Value>) {
+    // Brute-Force-Schutz: Login-Versuche teilen sich ein globales
+    // LLM-Limit-Budget (30/min), bevor der Key geprueft wird.
+    if let Err(retry) = state.rate_limiter.check_llm("login") {
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(json!({ "error": format!("Zu viele Login-Versuche, warte {retry}s") })),
+        );
+    }
     match state.auth.login(&body.key) {
         Some(token) => {
             let info = state

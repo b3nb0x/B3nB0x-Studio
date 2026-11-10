@@ -39,21 +39,24 @@ where
     F: Fn(&serde_json::Value) -> Option<String> + Send + 'static,
 {
 
-    let mut buffer = String::new();
+    // Bytes puffern, nicht Strings: Multibyte-Zeichen (Umlaute, Emoji) ueber
+    // Chunk-Grenzen wuerden bei from_utf8_lossy pro Chunk zu U+FFFD zerfallen.
+    let mut buffer: Vec<u8> = Vec::new();
     let mut stream = Box::pin(byte_stream);
 
     let inner = futures_util::stream::poll_fn(move |cx| {
         loop {
             match stream.as_mut().poll_next(cx) {
                 Poll::Ready(Some(Ok(bytes))) => {
-                    buffer.push_str(&String::from_utf8_lossy(&bytes));
-                    while let Some(pos) = buffer.find('\n') {
-                        let line: String = buffer.drain(..=pos).collect();
+                    buffer.extend_from_slice(&bytes);
+                    while let Some(pos) = buffer.iter().position(|&b| b == b'\n') {
+                        let line_bytes: Vec<u8> = buffer.drain(..=pos).collect();
+                        let line = String::from_utf8_lossy(&line_bytes);
                         let line = line.trim();
                         if line.is_empty() {
                             continue;
                         }
-                        if let Some(data) = line.strip_prefix("data: ") {
+                        if let Some(data) = line.strip_prefix("data:").map(str::trim_start) {
                             if data.trim() == "[DONE]" {
                                 return Poll::Ready(None);
                             }
@@ -83,11 +86,14 @@ where
                 }
                 Poll::Ready(Some(Err(e))) => return Poll::Ready(Some(Err(StreamError::Http(e)))),
                 Poll::Ready(None) => {
-                    if let Some(data) = buffer.trim().strip_prefix("data: ") {
-                        if data.trim() != "[DONE]" {
-                            if let Ok(value) = serde_json::from_str::<serde_json::Value>(data.trim()) {
-                                if let Some(chunk) = extract(&value) {
-                                    return Poll::Ready(Some(Ok(chunk)));
+                    if !buffer.is_empty() {
+                        let rest = String::from_utf8_lossy(&buffer);
+                        if let Some(data) = rest.trim().strip_prefix("data:").map(str::trim_start) {
+                            if data.trim() != "[DONE]" {
+                                if let Ok(value) = serde_json::from_str::<serde_json::Value>(data.trim()) {
+                                    if let Some(chunk) = extract(&value) {
+                                        return Poll::Ready(Some(Ok(chunk)));
+                                    }
                                 }
                             }
                         }

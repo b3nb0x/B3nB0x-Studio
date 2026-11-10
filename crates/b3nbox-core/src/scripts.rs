@@ -70,7 +70,27 @@ impl ScriptRunner {
         if self.allowed_dirs.is_empty() {
             return true;
         }
-        self.allowed_dirs.iter().any(|dir| command.starts_with(dir))
+        // Kanonisieren, sonst matcht "scripts" auch "scripts-evil/…" und
+        // "scripts/../bin". Nicht existierende Commands: Parent kanonisieren
+        // (Register-Zeitpunkt), sonst fail-closed.
+        let cmd_path = std::path::Path::new(command);
+        let cmd_canon = cmd_path
+            .canonicalize()
+            .or_else(|_| {
+                cmd_path.parent().filter(|p| !p.as_os_str().is_empty()).ok_or(()).and_then(|parent| {
+                    parent
+                        .canonicalize()
+                        .map(|p| p.join(cmd_path.file_name().unwrap_or_default()))
+                        .map_err(|_| ())
+                })
+            })
+            .unwrap_or_else(|_| cmd_path.to_path_buf());
+        self.allowed_dirs.iter().any(|dir| {
+            std::path::Path::new(dir)
+                .canonicalize()
+                .map(|d| cmd_canon.starts_with(d))
+                .unwrap_or(false)
+        })
     }
 
     pub async fn run(&self, name: &str, approval: bool) -> Result<ScriptResult, String> {
@@ -92,7 +112,12 @@ impl ScriptRunner {
             });
         }
 
-        let run = tokio::process::Command::new(&spec.command).args(&spec.args).output();
+        // kill_on_drop: Bei Timeout wird das output()-Future gedroppt —
+        // ohne dieses Flag laeuft der Child-Prozess als Orphan weiter.
+        let run = tokio::process::Command::new(&spec.command)
+            .args(&spec.args)
+            .kill_on_drop(true)
+            .output();
         let output = match tokio::time::timeout(
             std::time::Duration::from_secs(spec.timeout_secs),
             run,
@@ -271,6 +296,64 @@ mod tests {
             .await
             .unwrap_err();
         assert!(err.contains("erlaubten Verzeichnisse"));
+    }
+
+    #[tokio::test]
+    async fn path_restriction_blocks_prefix_tricks() {
+        let runner = ScriptRunner::new(vec!["scripts".into()], false);
+        // "scripts-evil" startet mit "scripts" — darf ohne Kanonisierung
+        // nicht durchgehen; existiert nicht -> fail-closed.
+        let err = runner
+            .register(ScriptSpec {
+                name: "evil2".into(),
+                command: "scripts-evil/evil.sh".into(),
+                args: vec![],
+                description: String::new(),
+                timeout_secs: 30,
+            })
+            .await
+            .unwrap_err();
+        assert!(err.contains("erlaubten Verzeichnisse"));
+        // Traversal ueber ".." muss ebenfalls abgelehnt werden
+        let err = runner
+            .register(ScriptSpec {
+                name: "evil3".into(),
+                command: "scripts/../evil.sh".into(),
+                args: vec![],
+                description: String::new(),
+                timeout_secs: 30,
+            })
+            .await
+            .unwrap_err();
+        assert!(err.contains("erlaubten Verzeichnisse"));
+    }
+
+    #[tokio::test]
+    async fn timeout_kills_process() {
+        let runner = ScriptRunner::new(vec![], false);
+        runner
+            .register(ScriptSpec {
+                name: "sleep".into(),
+                command: "sleep".into(),
+                args: vec!["30".into()],
+                description: String::new(),
+                timeout_secs: 1,
+            })
+            .await
+            .unwrap();
+        let result = runner.run("sleep", false).await.unwrap();
+        assert_eq!(result.status, "timeout");
+        // kill_on_drop: der orphan-Prozess darf nicht weiterlaufen
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        let orphan = tokio::process::Command::new("pgrep")
+            .args(["-f", "sleep 30"])
+            .output()
+            .await
+            .unwrap();
+        assert!(
+            String::from_utf8_lossy(&orphan.stdout).trim().is_empty(),
+            "sleep-Prozess wurde beim Timeout nicht gekillt"
+        );
     }
 
     #[tokio::test]
