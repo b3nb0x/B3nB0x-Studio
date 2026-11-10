@@ -50,6 +50,12 @@ export const api = {
   mcpTools: () => req("/v1/mcp/tools"),
   mcpCall: (server: string, tool: string, args: unknown) =>
     req("/v1/mcp/call", { method: "POST", body: JSON.stringify({ server, tool, arguments: args }) }),
+  mcpServers: () => req("/v1/mcp/servers"),
+  mcpAddServer: (name: string, command: string, args: string[]) =>
+    req("/v1/mcp/servers", { method: "POST", body: JSON.stringify({ name, command, args }) }),
+  mcpRemoveServer: (name: string) =>
+    req(`/v1/mcp/servers/${encodeURIComponent(name)}`, { method: "DELETE" }),
+  mcpCatalog: () => req("/v1/mcp/catalog"),
   agentRun: (task: string, route: string, maxIterations: number) =>
     req("/v1/agent/run", {
       method: "POST",

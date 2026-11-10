@@ -41,6 +41,40 @@ pub struct McpClient {
     next_id: AtomicU64,
 }
 
+/// Grundauswahl: haeufig genutzte MCP-Server fuer den Schnellstart.
+pub const MCP_CATALOG: &[(&str, &str, &[&str])] = &[
+    (
+        "filesystem",
+        "Dateisystem-Zugriff (lesen/schreiben im Projektordner)",
+        &["npx", "-y", "@modelcontextprotocol/server-filesystem", "."],
+    ),
+    (
+        "git",
+        "Git-Operationen (status, diff, log, commit)",
+        &["npx", "-y", "@modelcontextprotocol/server-git"],
+    ),
+    (
+        "fetch",
+        "HTTP/Webseiten abrufen und in Text umwandeln",
+        &["npx", "-y", "@modelcontextprotocol/server-fetch"],
+    ),
+    (
+        "memory",
+        "Persistenter Wissens-Speicher (Knowledge-Graph)",
+        &["npx", "-y", "@modelcontextprotocol/server-memory"],
+    ),
+    (
+        "sqlite",
+        "SQLite-Datenbank abfragen",
+        &["npx", "-y", "@modelcontextprotocol/server-sqlite", "--db-path", "data/mcp-sqlite.db"],
+    ),
+    (
+        "time",
+        "Zeiten und Zeitzonen berechnen",
+        &["npx", "-y", "@modelcontextprotocol/server-time"],
+    ),
+];
+
 impl McpClient {
     pub fn new(name: &str) -> Self {
         Self {
@@ -168,6 +202,7 @@ impl McpClient {
 
 pub struct McpRegistry {
     servers: Mutex<std::collections::HashMap<String, Arc<McpClient>>>,
+    configs: Mutex<std::collections::HashMap<String, McpServerConfig>>,
 }
 
 impl Default for McpRegistry {
@@ -180,6 +215,7 @@ impl McpRegistry {
     pub fn new() -> Self {
         Self {
             servers: Mutex::new(std::collections::HashMap::new()),
+            configs: Mutex::new(std::collections::HashMap::new()),
         }
     }
 
@@ -187,7 +223,33 @@ impl McpRegistry {
         let client = Arc::new(McpClient::new(name));
         client.start(config)?;
         self.servers.lock().unwrap().insert(name.to_string(), client);
+        self.configs
+            .lock()
+            .unwrap()
+            .insert(name.to_string(), config.clone());
         Ok(())
+    }
+
+    /// Stoppt und entfernt einen MCP-Server. Gibt true zurueck, wenn er existierte.
+    pub fn unregister(&self, name: &str) -> bool {
+        let client = self.servers.lock().unwrap().remove(name);
+        self.configs.lock().unwrap().remove(name);
+        if let Some(client) = client {
+            client.stop();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Konfigurierte Server (Name + Config), auch wenn der Start fehlschlug.
+    pub fn list_servers(&self) -> Vec<(String, McpServerConfig)> {
+        self.configs
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(n, c)| (n.clone(), c.clone()))
+            .collect()
     }
 
     pub fn list_tools(&self) -> Vec<(String, Vec<McpTool>)> {
@@ -252,5 +314,14 @@ done
 
         let result = registry.call("echo", "echo", json!({ "text": "hi" })).unwrap();
         assert_eq!(result["content"][0]["text"], "ok");
+
+        // Grundauswahl-Katalog nicht leer
+        assert!(!MCP_CATALOG.is_empty());
+        assert!(MCP_CATALOG.iter().all(|(n, d, c)| !n.is_empty() && !d.is_empty() && !c.is_empty()));
+
+        // Unregister entfernt Server und stoppt den Prozess
+        assert!(registry.unregister("echo"));
+        assert!(!registry.unregister("echo"));
+        assert!(registry.list_servers().is_empty());
     }
 }

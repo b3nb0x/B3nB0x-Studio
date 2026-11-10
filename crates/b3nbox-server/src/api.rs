@@ -30,6 +30,9 @@ pub fn routes() -> AxumRouter<AppState> {
         .route("/v1/permissions/check", post(check_permission))
         .route("/v1/mcp/tools", get(mcp_tools))
         .route("/v1/mcp/call", post(mcp_call))
+        .route("/v1/mcp/servers", get(mcp_list_servers).post(mcp_add_server))
+        .route("/v1/mcp/servers/{name}", axum::routing::delete(mcp_remove_server))
+        .route("/v1/mcp/catalog", get(mcp_catalog))
         .route("/v1/agent/run", post(agent_run))
         .route("/v1/scripts", get(list_scripts).post(register_script))
         .route("/v1/scripts/{name}/run", post(run_script))
@@ -540,6 +543,7 @@ const ADMIN_WRITE_PATHS: &[&str] = &[
     "/v1/scripts",
     "/v1/schedule",
     "/v1/rate-limit",
+    "/v1/mcp",
 ];
 
 pub async fn auth_middleware(
@@ -836,6 +840,99 @@ async fn mcp_call(State(state): State<AppState>, Json(body): Json<McpCallBody>) 
         Ok(result) => Json(json!({ "status": "ok", "result": result })),
         Err(e) => Json(json!({ "status": "error", "error": e.to_string() })),
     }
+}
+
+// --- MCP-Server-Verwaltung (GUI-CRUD, persistiert in data/mcp-servers.json) ---
+
+fn mcp_store_path() -> std::path::PathBuf {
+    std::path::PathBuf::from("data/mcp-servers.json")
+}
+
+fn mcp_store_load() -> std::collections::HashMap<String, b3nbox_core::mcp::McpServerConfig> {
+    std::fs::read_to_string(mcp_store_path())
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+fn mcp_store_save(servers: &std::collections::HashMap<String, b3nbox_core::mcp::McpServerConfig>) -> Result<(), String> {
+    if let Some(dir) = mcp_store_path().parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    let json = serde_json::to_string_pretty(servers).map_err(|e| e.to_string())?;
+    std::fs::write(mcp_store_path(), json).map_err(|e| e.to_string())
+}
+
+async fn mcp_list_servers(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let servers: Vec<serde_json::Value> = state
+        .mcp
+        .list_servers()
+        .into_iter()
+        .map(|(name, cfg)| json!({ "name": name, "command": cfg.command, "args": cfg.args }))
+        .collect();
+    Json(json!({ "servers": servers }))
+}
+
+#[derive(Deserialize)]
+struct McpAddBody {
+    name: String,
+    command: String,
+    #[serde(default)]
+    args: Vec<String>,
+}
+
+async fn mcp_add_server(State(state): State<AppState>, Json(body): Json<McpAddBody>) -> Json<serde_json::Value> {
+    if body.name.is_empty() || body.command.is_empty() {
+        return Json(json!({ "error": "'name' und 'command' sind erforderlich" }));
+    }
+    if !body
+        .name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Json(json!({ "error": "Name darf nur Buchstaben, Ziffern, '-' und '_' enthalten" }));
+    }
+    let cfg = b3nbox_core::mcp::McpServerConfig {
+        command: body.command.clone(),
+        args: body.args.clone(),
+    };
+    if let Err(e) = state.mcp.register(&body.name, &cfg) {
+        return Json(json!({ "error": format!("Start fehlgeschlagen: {e}") }));
+    }
+    let mut store = mcp_store_load();
+    store.insert(body.name.clone(), cfg);
+    if let Err(e) = mcp_store_save(&store) {
+        tracing::warn!("MCP-Store konnte nicht gespeichert werden: {e}");
+    }
+    let tools = state
+        .mcp
+        .list_tools()
+        .into_iter()
+        .find(|(n, _)| *n == body.name)
+        .map(|(_, t)| t)
+        .unwrap_or_default();
+    Json(json!({ "status": "ok", "name": body.name, "tools": tools }))
+}
+
+async fn mcp_remove_server(State(state): State<AppState>, Path(name): Path<String>) -> Json<serde_json::Value> {
+    let mut store = mcp_store_load();
+    store.remove(&name);
+    if let Err(e) = mcp_store_save(&store) {
+        tracing::warn!("MCP-Store konnte nicht gespeichert werden: {e}");
+    }
+    if state.mcp.unregister(&name) {
+        Json(json!({ "status": "ok", "removed": name }))
+    } else {
+        Json(json!({ "status": "ok", "removed": name, "note": "war nicht aktiv" }))
+    }
+}
+
+async fn mcp_catalog() -> Json<serde_json::Value> {
+    let catalog: Vec<serde_json::Value> = b3nbox_core::mcp::MCP_CATALOG
+        .iter()
+        .map(|(name, desc, cmd)| json!({ "name": name, "description": desc, "command": cmd[0], "args": &cmd[1..] }))
+        .collect();
+    Json(json!({ "catalog": catalog }))
 }
 
 async fn search_memory(

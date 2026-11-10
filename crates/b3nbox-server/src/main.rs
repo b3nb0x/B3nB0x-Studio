@@ -109,6 +109,21 @@ async fn main() {
             Err(e) => tracing::warn!("MCP-Server '{name}' Start fehlgeschlagen: {e}"),
         }
     }
+    // Zusatz: per GUI hinzugefuegte Server (data/mcp-servers.json)
+    let mcp_store: HashMap<String, b3nbox_core::mcp::McpServerConfig> =
+        std::fs::read_to_string("data/mcp-servers.json")
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default();
+    for (name, server_config) in &mcp_store {
+        if mcp.list_servers().iter().any(|(n, _)| n == name) {
+            continue;
+        }
+        match mcp.register(name, server_config) {
+            Ok(()) => tracing::info!("MCP-Server '{name}' aus Store gestartet"),
+            Err(e) => tracing::warn!("MCP-Server '{name}' aus Store nicht gestartet: {e}"),
+        }
+    }
 
     let scripts = Arc::new(b3nbox_core::scripts::ScriptRunner::new(
         config.scripts.allowed_dirs.clone(),
