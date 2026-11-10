@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/banner.jpg" alt="B3nB0x Studio LLM Manager" width="640">
+</p>
+
 # B3nBox Studio
 
 Agent mit eingebautem **LLM Manager** — Rust-Kern, Python-SDK und Web-GUI.
