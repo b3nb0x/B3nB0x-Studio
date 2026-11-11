@@ -1,29 +1,115 @@
-<p align="center">
-  <img src="docs/banner.jpg" alt="B3nB0x Studio LLM Manager" width="640">
-</p>
+# B3nBox Studio
 
-<h1 align="center">B3nBox Studio</h1>
+**Ein KI-Assistent mit eingebautem LLM-Manager** — du sprichst mit einem Assistenten, der Modelle wechseln, Skripte ausführen und Tools nutzen kann. Alles läuft auf deinem eigenen Rechner, deine Daten verlassen das Haus nicht.
 
-<p align="center">
-  <strong>Agent mit eingebautem LLM Manager</strong> — Rust-Kern, Python-SDK und Web-GUI
-</p>
+---
 
-<p align="center">
-  <a href="https://github.com/b3nb0x/B3nB0x-Studio/releases"><img src="https://img.shields.io/badge/release-v0.1.0-8b5cf6?style=flat-square&logo=github" alt="Release v0.1.0"></a>
-  <a href="https://github.com/b3nb0x/B3nB0x-Studio/actions"><img src="https://img.shields.io/badge/tests-49%2F49-22c55e?style=flat-square&logo=githubactions" alt="Tests 49/49"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-f97316?style=flat-square" alt="License Apache-2.0"></a>
-  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-1.75%2B-3b82f6?style=flat-square&logo=rust&logoColor=white" alt="Rust"></a>
-  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/tools-MCP-a855f7?style=flat-square" alt="MCP"></a>
-</p>
+## Was ist das? (in 30 Sekunden)
 
-<p align="center">
-  <a href="#installation">Installation</a> ·
-  <a href="#schnellstart">Schnellstart</a> ·
-  <a href="#architektur">Architektur</a> ·
-  <a href="#prompt-injection-schutz">Sicherheit</a>
-</p>
+Stell dir vor, du hast einen Assistenten, der Code schreiben, dein Projekt verstehen und Aufgaben ausführen kann. B3nBox Studio verbindet diesen Assistenten mit **deinen eigenen KI-Modellen** (z. B. über Ollama) — auf deinem Rechner, ohne Cloud-Zwang.
 
-## Architektur
+```
+┌────────────┐     ┌──────────────┐     ┌──────────────┐
+│  Web-GUI   │────▶│  B3nBox-     │────▶│   Ollama /   │
+│ (Browser)  │     │  Server      │     │   llama.cpp  │
+└────────────┘     └──────────────┘     └──────────────┘
+     nginx              Rust              deine Modelle
+```
+
+---
+
+## Schnellstart (3 Schritte)
+
+### Schritt 1: Installieren
+
+Kopiere diese eine Zeile in dein Terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/b3nb0x/B3nB0x-Studio/main/install.sh | sh
+```
+
+Das installiert alles nach `~/.b3nbox` und erzeugt automatisch deinen **API-Key** (siehe Ausgabe — bitte sofort notieren!).
+
+**Voraussetzungen:** Linux, `curl` oder `wget`. Mehr brauchst du nicht.
+
+### Schritt 2: Starten
+
+```bash
+~/.b3nbox/bin/b3nbox-server ~/.b3nbox/config/b3nbox.toml
+```
+
+Fertig. Die Weboberfläche läuft ab jetzt unter: **http://127.0.0.1:8300**
+
+> **Hinweis:** Deine Modelle (z. B. Ollama) müssen ebenfalls laufen — siehe unten „Ein Modell hinzufügen".
+
+### Schritt 3: Einloggen und loslegen
+
+1. Öffne **http://127.0.0.1:8300** im Browser
+2. Klicke im Menü auf **„Login"** und gib deinen API-Key ein
+3. Fertig — im **Dashboard** siehst du Status und Modelle
+
+---
+
+## Ein Modell hinzufügen (z. B. Ollama)
+
+Ohne Modell kann der Assistent nicht chatten. Das geht in 2 Schritten:
+
+```bash
+# 1. Ollama installieren (falls nicht vorhanden):
+curl -fsSL https://ollama.com/install.sh | sh
+
+# 2. Ein kleines Modell laden:
+ollama pull qwen2.5:0.5b
+```
+
+Ollama läuft danach automatisch auf Port 11434 — B3nBox findet es selbst.
+
+**Welches Modell?** Für den Anfang: `qwen2.5:0.5b` (klein, schnell). Für bessere Antworten: `qwen2.5-coder:7b` (größer, braucht mehr RAM).
+
+---
+
+## Was kann der Assistent? (die wichtigsten Begriffe)
+
+| Begriff | Bedeutung |
+|---|---|
+| **Dashboard** | Übersicht: Welche Modelle laufen? Ist alles erreichbar? |
+| **Modell-Routing** | Jede Aufgabe zeigt auf ein Modell — live umschaltbar, ohne Neustart |
+| **Pipeline** | Große Aufgaben in 4 Phasen: Analyse → Plan → Umsetzen → Kontrolle |
+| **Memory** | Der Assistent merkt sich Projektwissen dauerhaft |
+| **MCP-Tools** | Externe Tools verbinden (Dateien lesen, Git, Webseiten) — per Klick, keine Dateien bearbeiten |
+| **Skripte** | Eigene Befehle registrieren, die der Assistent ausführen darf |
+| **Guard** | Schutz vor Manipulationsversuchen (Prompt-Injection) |
+| **Rate-Limit** | Begrenzt, wie viele Anfragen pro Minute erlaubt sind |
+
+---
+
+## Häufige Probleme (und Lösungen)
+
+| Problem | Lösung |
+|---|---|
+| „Keine Route für 'default' konfiguriert" | In `~/.b3nbox/config/b3nbox.toml` eine `[routing.default]`-Sektion ergänzen (siehe `config/b3nbox.toml.example`) |
+| „Backend 'ollama' antwortete mit Fehler" | Läuft Ollama? Test: `curl http://127.0.0.1:11434/api/version` |
+| GUI nicht erreichbar | Läuft der Server? Test: `curl http://127.0.0.1:8300/health` |
+| Key verloren | Neuen Key erzeugen: `~/.b3nbox/bin/b3nbox-server --generate-key`, Hash in die Config eintragen, Server neu starten |
+| Port 8300 belegt | Anderen Port: in der Config `[server] port = 8400` setzen und Server neu starten |
+
+---
+
+## Netzwerk-Zugriff (von einem anderen Rechner)
+
+Standardmäßig ist alles nur lokal erreichbar (sicher). Für Zugriff von deinem Rechner im Netz:
+
+1. In `~/.b3nbox/config/b3nbox.toml`: `host = "0.0.0.0"` setzen
+2. Firewall freigeben: `sudo ufw allow 80/tcp`
+3. nginx-Konfiguration aus dem Repo verwenden (`deploy/nginx-b3nbox.conf`) — sie erlaubt **nur das lokale Netz** (10.x/172.16.x/192.168.x) mit API-Key; alles andere wird blockiert
+4. GUI-Rollout: `sudo /home/b3n/script.sh`
+
+---
+
+## Für Fortgeschrittene
+
+<details>
+<summary>Architektur</summary>
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -52,167 +138,47 @@
 ┌──────────────────────▼──────────────────────────┐
 │      Python SDK `b3nbox`                        │
 │  Client · PipelineClient · TaskManager ·        │
-│  RebootScheduler (Approval-Gate) · ScriptRunner  │
+│  RebootScheduler (Approval-Gate) · ScriptRunner │
 └──────────────────────────────────────────────────┘
 ```
 
-## Komponenten
+</details>
 
-| Komponente | Pfad | Beschreibung |
-|---|---|---|
-| 🤖 Agent-Loop | `crates/b3nbox-core/src/agent.rs` | Autonome Tool-Use-Loops (MCP-Tools + Express-Tasks) |
-| LLM Manager Core | `crates/b3nbox-core` | Backend-Adapter, Routing-Engine, REA/ECC-Pipeline |
-| LLM Manager Server | `crates/b3nbox-server` | REST-API (axum), lauscht auf `127.0.0.1:8300` |
-| Python SDK | `python/` | Agent-Logik, Express-Tasks, Pipeline-Steuerung |
-| Web-GUI | `gui/` | React/Vite/TS: Dashboard, Routing, Pipeline, Tasks, Memory, Permissions, MCP |
-| Memory-Layer | `crates/b3nbox-core/src/memory.rs` | SQLite (bundled): Projektkontext, wird in die Pipeline-Analyse injiziert |
-| Permission-System | `crates/b3nbox-core/src/permissions.rs` | Allow/Deny-Regeln pro Aktion + Scope, default-allow/default-deny |
-| MCP-Bindings | `crates/b3nbox-core/src/mcp.rs` | Externe MCP-Server (JSON-RPC über stdio), Registry + Tool-Aufrufe |
-| Native-Inferenz | `crates/b3nbox-core/src/native.rs` | GGUF direkt im Server (Feature `native-inference`, benötigt libclang) |
-
-## Installation
-
-### Einzeiler (Linux x86_64 / aarch64)
-
-Der offizielle Weg:
+<details>
+<summary>Manuelle Installation (aus dem Quellcode)</summary>
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/b3nb0x/B3nB0x-Studio/main/install.sh | sh
-```
-
-Der Installer:
-- laedt das passende Release-Binary (oder faellt auf Quellcode-Bau mit cargo zurueck)
-- prueft die Firewall (ufw, firewalld, nftables/iptables) und warnt, wenn Port 8300 bei aktivem Filter nicht freigegeben ist - inkl. fertiger Freigabe-Befehle
-- prueft, ob der Port bereits belegt ist
-- erzeugt Konfiguration mit frischem Admin-API-Key (--generate-key, nur der Hash landet in der Config)
-- optional: SET_SERVICE=1 richtet einen systemd-Benutzer-Service ein
-
-Varianten:
-
-```bash
-INSTALL_DIR=~/.b3nbox sh install.sh   # anderes Verzeichnis
-SET_SERVICE=1 sh install.sh           # + systemd-Service
-VERSION=v0.1.0 sh install.sh           # bestimmte Version
-```
-
-### Manuell (Quellcode)
-
-```bash
-git clone https://github.com/b3nb0x/B3nB0x-Studio && cd B3nB0x-Studio
+git clone https://github.com/b3nb0x/B3nB0x-Studio.git
+cd B3nB0x-Studio
 cargo build --release
-./target/release/b3nbox-server --generate-key    # Key + Hash erzeugen
-cp config/b3nbox.toml.example config/b3nbox.toml # Hash eintragen
-./target/release/b3nbox-server config/b3nbox.toml
-```
+cp target/release/b3nbox-server ~/.local/bin/
 
-## Schnellstart
+# GUI bauen (Node.js 22+):
+cd gui && npm install && npm run build
 
-```bash
-# 1. Konfiguration anlegen
+# Konfiguration:
 cp config/b3nbox.toml.example config/b3nbox.toml
-
-# 2. LLM Manager starten
-cargo run --release
-
-# 3. Web-GUI (separates Terminal)
-cd gui && npm install && npm run dev
-# → http://localhost:5173 (Proxy auf :8300)
+# API-Key erzeugen:
+~/.local/bin/b3nbox-server --generate-key
 ```
 
-### Python SDK
+</details>
 
-```bash
-cd python && pip install -e .
-```
+<details>
+<summary>Python-SDK nutzen</summary>
 
 ```python
-from b3nbox import B3nBoxClient, PipelineClient, Phase, TaskManager, RebootScheduler, ScriptRunner
+from b3nbox import B3nBoxClient
 
-client = B3nBoxClient("http://127.0.0.1:8300")
-
-# Chat über eine Route
-print(client.chat([{"role": "user", "content": "Hallo!"}], route="default"))
-
-# REA/ECC-Pipeline: jede Phase kann ein anderes Modell nutzen
-pipeline = PipelineClient(client)
-run = pipeline.run("CLI-Tool für Log-Analyse in Rust")
-pipeline.switch_phase(Phase.IMPLEMENT, "ollama", "qwen2.5-coder:14b")
-
-# Express-Tasks
-tasks = TaskManager(client)
-tasks.create("System-Check", "Prüfe Speicher, Disk, Services.", route="default")
-tasks.run("<task-id>")
-
-# Reboot nur mit expliziter Freigabe
-scheduler = RebootScheduler(client)
-scheduler.register_reboot("03:00", "Wartungsfenster")
-print(scheduler.execute_reboot(dry_run=True))  # kein echter Reboot
+with B3nBoxClient(base_url="http://127.0.0.1:8300", api_key="bxk-...") as client:
+    client.login("bxk-...")
+    answer = client.chat([{"role": "user", "content": "Hallo!"}])
+    print(answer["content"])
 ```
 
-## API-Übersicht
+</details>
 
-| Methode | Pfad | Funktion |
-|---|---|---|
-| GET | `/health` | Health-Check |
-| GET | `/v1/models` | Alle Modelle aller Backends |
-| POST | `/v1/chat` | Chat über eine Route (`route`-Key) |
-| GET/PUT | `/v1/routing` | Routing-Tabelle lesen / Route setzen |
-| POST | `/v1/pipeline/runs` | REA/ECC-Pipeline starten |
-| GET | `/v1/pipeline/runs/{id}` | Run-Status & Phasen-Ergebnisse |
-| POST | `/v1/pipeline/switch` | Phase live auf anderes Modell schalten |
-| GET/POST | `/v1/tasks` | Express-Tasks listen / registrieren |
-| POST | `/v1/tasks/{id}/run` | Express-Task ausführen |
-| GET/POST | `/v1/memory` | Memory durchsuchen (`?q=`) / Eintrag hinzufügen |
-| GET | `/v1/memory/recent` | Letzte Memory-Einträge |
-| GET/POST | `/v1/permissions` | Regeln listen / hinzufügen |
-| POST | `/v1/permissions/check` | Aktion gegen Regeln prüfen |
-| GET | `/v1/mcp/tools` | Tools aller verbundenen MCP-Server |
-| POST | `/v1/mcp/call` | MCP-Tool aufrufen (`server`, `tool`, `arguments`) |
-| POST | `/v1/agent/run` | Agent-Loop mit Tool-Use starten (`task`, `route`, `max_iterations`) |
-| POST | `/v1/memory/search-semantic` | Semantische Suche (Embeddings über Route `embeddings`) |
-| GET/POST | `/v1/scripts` | Skripte listen / registrieren (Pfad-Einschränkung, Approval-Gate) |
-| POST | `/v1/scripts/{name}/run` | Skript ausführen (`approval`-Flag) |
-| GET/POST/DELETE | `/v1/schedule` | Schedules listen / anlegen / entfernen |
-| POST | `/v1/schedule/tick` | Scheduler-Tick manuell auslösen |
-| GET/POST | `/v1/sessions` | Sessions listen / anlegen |
-| GET/DELETE | `/v1/sessions/{id}` | Session-Historie / Session löschen |
-| POST | `/v1/sessions/{id}/chat` | Chat mit Session-Kontext (Historie) |
-| POST | `/v1/chat/stream` | Chat als SSE-Stream |
-| GET | `/v1/audit` | Audit-Log (letzte LLM-Interaktionen) |
-| GET | `/v1/guard/blocked` | Injection-Guard: Config + Block-Log |
-
-## Netzwerk- & Zugriffsschutz
-
-- **Auth** (`[auth]`): API-Keys als SHA-256-Hash in der Config (`--generate-key` erzeugt Key + Hash), Session-Tokens (12h TTL), Rollen `admin`/`user` — Schreibzugriffe auf Verwaltungs-Endpunkte nur für Admins
-- **HTTPS** (`[server] https = true`): Rustls — ohne Zertifikats-Pfade wird automatisch ein Self-Signed-Zertifikat generiert (lokal); für Domänen Let's-Encrypt-Zertifikate per `cert_path`/`key_path` einbinden
-- **Rate-Limiting** (`[rate_limit]`): Token-Bucket pro Client, Standard 150 Requests/min + separates LLM-Limit (30/min), zur Laufzeit admin-einstellbar (`POST /v1/rate-limit`), `429` + `Retry-After`
-
-## Prompt-Injection-Schutz
-
-Der Agent ist mehrschichtig gegen Prompt-Injection gehärtet:
-
-1. **Guard-Scanner** (`[guard]` in der Config): 30+ Signaturen (DE/EN), Unicode-Normalisierung, Homoglyph- und Zero-Width-Evasion-Schutz, Modi `block`/`log-only`
-2. **Strukturelle Isolation**: Tool-Outputs werden als reine Daten ummantelt, Role-Marker und Decision-Fakes neutralisiert, gehärteter System-Prompt
-3. **Argument-Validierung**: LLM-generierte Tool-Argumente werden auf Shell-Metazeichen und Pfad-Traversal geprüft, Skript-Registrierungen ebenso
-4. **Defense in Depth**: Selbst bei Durchbruch begrenzt das Permission-System den Schadensradius; jeder Block landet im Guard-Log und Audit-Log
-
-### Native Inferenz (GGUF direkt im Server)
-
-```bash
-# benötigt libclang-dev + cmake
-sudo apt install libclang-dev
-
-cargo build --release --features b3nbox-server/native-inference
-# danach in config/b3nbox.toml:
-# [backends.native]
-# type = "native"
-# model_path = "/pfad/zu/modell.gguf"
-```
-
-## Roadmap
-
-- **Phase 5**: KV-Cache-Reuse für Native-Inferenz, Plugin-/Persona-System, WebSocket-Live-Events, Multi-User
-- Einfluss-Quellen: Openclaw (Personas/Plugins), Hermes (Tool-Orchestrierung), Opencode (Session-Management), Claude Code (Plan Mode, Permissions)
+---
 
 ## Lizenz
 
