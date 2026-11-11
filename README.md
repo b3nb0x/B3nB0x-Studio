@@ -111,6 +111,10 @@ Standardmäßig ist alles nur lokal erreichbar (sicher). Für Zugriff von deinem
 <details>
 <summary>Architektur</summary>
 
+<p align="center">
+  <img src="docs/architecture.png" alt="B3nB0x Studio LLM Manager Architektur" width="720">
+</p>
+
 ```
 ┌─────────────────────────────────────────────────┐
 │                 Web-GUI (React/TS)              │
