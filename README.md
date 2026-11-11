@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/banner.jpg" alt="B3nB0x Studio LLM Manager" width="640">
+</p>
+
 # B3nBox Studio
 
 **Ein KI-Assistent mit eingebautem LLM-Manager** — du sprichst mit einem Assistenten, der Modelle wechseln, Skripte ausführen und Tools nutzen kann. Alles läuft auf deinem eigenen Rechner, deine Daten verlassen das Haus nicht.
