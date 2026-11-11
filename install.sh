@@ -99,16 +99,18 @@ install_from_release() {
     ASSET="b3nbox-${OS}-${ARCH}.tar.gz"
     URL="${GITHUB}/releases/download/${TAG}/${ASSET}"
     say "Lade ${URL}..."
+    DLDIR=$(mktemp -d)
     if command -v curl >/dev/null 2>&1; then
-        curl -fsSL "$URL" -o /tmp/b3nbox-download.tar.gz || return 1
+        curl -fsSL "$URL" -o "$DLDIR/b3nbox-download.tar.gz" || return 1
     else
-        wget -q "$URL" -O /tmp/b3nbox-download.tar.gz || return 1
+        wget -q "$URL" -O "$DLDIR/b3nbox-download.tar.gz" || return 1
     fi
-    tar -xzf /tmp/b3nbox-download.tar.gz -C /tmp || return 1
-    mv /tmp/b3nbox-server "$INSTALL_DIR/bin/" 2>/dev/null || return 1
-    if [ -d /tmp/gui-dist ]; then
+    tar -xzf "$DLDIR/b3nbox-download.tar.gz" -C "$DLDIR" || return 1
+    mv "$DLDIR"/b3nbox-server "$INSTALL_DIR/bin/" || return 1
+    rm -rf "$DLDIR"
+    if [ -d "$DLDIR/gui-dist" ]; then
         rm -rf "$INSTALL_DIR/gui"
-        mv /tmp/gui-dist "$INSTALL_DIR/gui"
+        mv "$DLDIR/gui-dist" "$INSTALL_DIR/gui"
     fi
     say "Release ${TAG} installiert"
     return 0
@@ -129,7 +131,7 @@ install_from_source() {
         say "Baue Web-GUI..."
         (cd "$BUILD_DIR/gui" && npm install --silent && npm run build)
         rm -rf "$INSTALL_DIR/gui"
-        cp -r "$BUILD_DIR/gui/dist" "$INSTALL_DIR/gui"
+        cp -r "$BUILD_DIR/gui/dist" "$INSTALL_DIR/gui/dist"
     else
         warn "Node.js nicht gefunden - Web-GUI nicht gebaut (npm install && npm run build im gui/-Ordner nachholen)"
     fi
@@ -148,6 +150,8 @@ if [ ! -f "$INSTALL_DIR/config/b3nbox.toml" ]; then
     KEY_OUTPUT="$("$SERVER" --generate-key)"
     API_KEY=$(echo "$KEY_OUTPUT" | grep "API-Key:" | awk '{print $2}')
     KEY_HASH=$(echo "$KEY_OUTPUT" | grep "Hash:" | awk '{print $2}')
+    [ -n "$API_KEY" ] || die "Key-Generierung fehlgeschlagen (kein API-Key in Ausgabe)"
+    [ -n "$KEY_HASH" ] || die "Key-Generierung fehlgeschlagen (kein Hash in Ausgabe)"
 
     cat > "$INSTALL_DIR/config/b3nbox.toml" <<EOF
 # B3nBox Studio - automatisch erzeugte Konfiguration

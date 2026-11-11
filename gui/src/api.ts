@@ -16,9 +16,16 @@ async function req(path: string, init?: RequestInit): Promise<any> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  const resp = await fetch(`${BASE}${path}`, { headers, ...init });
+  const resp = await fetch(`${BASE}${path}`, {
+    headers,
+    ...init,
+    signal: AbortSignal.timeout(30000),
+  });
   if (!resp.ok) throw new Error(`API-Fehler ${resp.status}: ${await resp.text()}`);
-  return resp.json();
+  const data = await resp.json();
+  // Server liefert manche Fehler als 200 mit {"error": ...}
+  if (data && typeof data === "object" && data.error) throw new Error(data.error);
+  return data;
 }
 
 export const api = {

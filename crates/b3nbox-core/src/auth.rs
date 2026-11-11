@@ -134,6 +134,12 @@ impl Auth {
                     entry.name
                 ));
             }
+            if legacy {
+                tracing::warn!(
+                    "Key '{}' nutzt noch den ungesalzenen SHA-256-Legacy-Hash - neu generieren (--generate-key) und key_hash ersetzen",
+                    entry.name
+                );
+            }
             keys.push((
                 entry.key_hash.clone(),
                 AuthInfo {

@@ -20,6 +20,16 @@ class B3nBoxClient:
             headers["Authorization"] = f"Bearer {credential}"
         self._client = httpx.Client(base_url=self.base_url, timeout=timeout, headers=headers)
 
+    def close(self) -> None:
+        """Schliesst die zugrundeliegende HTTP-Verbindung."""
+        self._client.close()
+
+    def __enter__(self) -> "B3nBoxClient":
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.close()
+
     def login(self, api_key: str) -> dict:
         """Erzeugt eine Session aus einem API-Key."""
         resp = self._client.post("/v1/auth/login", json={"key": api_key})
@@ -66,4 +76,8 @@ class B3nBoxClient:
     def _check(resp: httpx.Response) -> dict:
         if resp.status_code >= 400:
             raise B3nBoxError(f"API-Fehler {resp.status_code}: {resp.text}")
-        return resp.json()
+        data = resp.json()
+        # Server liefert manche Fehler als 200 mit {"error": ...}
+        if isinstance(data, dict) and data.get("error"):
+            raise B3nBoxError(str(data["error"]))
+        return data

@@ -131,6 +131,9 @@ fn map_confusable(c: char) -> char {
     c
 }
 
+/// Ring-Buffer-Grenze fuer das Block-Log (Dauerbetrieb: kein Leak).
+const BLOCKED_LOG_CAP: usize = 1000;
+
 pub struct Guard {
     config: GuardConfig,
     router: Option<std::sync::Arc<crate::router::Router>>,
@@ -194,6 +197,13 @@ impl Guard {
             return None;
         }
         let normalized = Self::normalize(text);
+        // Zweite Variante: Interpunktion/Whitespace zwischen Woertern kollabieren,
+        // sonst umgeht "i**gnore** previous" und "ignore, previous" die Muster.
+        let collapsed: String = normalized
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|w| !w.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
         let extractive = Self::has_extractive_marker(&normalized);
         for pattern in PATTERNS {
             let applies = match pattern.severity {
@@ -210,7 +220,10 @@ impl Guard {
                 }
                 Severity::StrictOnly => Self::strict_context(context),
             };
-            if applies && normalized.contains(&pattern.needle.to_lowercase()) {
+            if applies
+                && (normalized.contains(&pattern.needle.to_lowercase())
+                    || collapsed.contains(&pattern.needle.to_lowercase()))
+            {
                 return Some(pattern.description);
             }
         }
@@ -299,6 +312,11 @@ impl Guard {
             reason: reason.to_string(),
             excerpt: original.chars().take(200).collect(),
         });
+        // Ring-Buffer: aelteste Eintraege verwerfen, kein Leak im Dauerbetrieb
+        if blocked.len() > BLOCKED_LOG_CAP {
+            let excess = blocked.len() - BLOCKED_LOG_CAP;
+            blocked.drain(..excess);
+        }
         tracing::warn!(
             "Guard blockiert (Kontext {:?}): {reason} | Auszug: {:?}",
             context,

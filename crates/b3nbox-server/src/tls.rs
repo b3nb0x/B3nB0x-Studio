@@ -52,8 +52,20 @@ fn generate_self_signed(cert_file: &str, key_file: &str) -> Result<(), String> {
     let cert_pem = certified_key.cert.pem();
     let key_pem = certified_key.key_pair.serialize_pem();
 
-    std::fs::write(cert_file, cert_pem).map_err(|e| e.to_string())?;
-    std::fs::write(key_file, key_pem).map_err(|e| e.to_string())?;
+    // Private Keys duerfen nicht world-readable landen (Unix: 0600).
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let key_permissions = std::fs::Permissions::from_mode(0o600);
+        std::fs::write(cert_file, &cert_pem).map_err(|e| e.to_string())?;
+        std::fs::write(key_file, &key_pem).map_err(|e| e.to_string())?;
+        std::fs::set_permissions(key_file, key_permissions).map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::write(cert_file, &cert_pem).map_err(|e| e.to_string())?;
+        std::fs::write(key_file, &key_pem).map_err(|e| e.to_string())?;
+    }
     tracing::info!(
         "Self-Signed-Zertifikat generiert: {cert_file} (lokale Nutzung - fuer Domaenen Let's Encrypt verwenden)"
     );

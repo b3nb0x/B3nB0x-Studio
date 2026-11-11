@@ -467,7 +467,7 @@ async fn run_script(
         return Json(json!({ "error": "Verweigert durch Permission-System", "check": check }));
     }
     let approval = body.map(|Json(b)| b.approval).unwrap_or(false);
-    match state.scripts.run(&name, approval).await {
+    match state.scripts.run(&name, approval, &[]).await {
         Ok(result) => Json(serde_json::to_value(result).unwrap()),
         Err(e) => Json(json!({ "status": "error", "error": e })),
     }
@@ -854,6 +854,10 @@ async fn mcp_call(State(state): State<AppState>, Json(body): Json<McpCallBody>) 
 
 // --- MCP-Server-Verwaltung (GUI-CRUD, persistiert in data/mcp-servers.json) ---
 
+// Read-Modify-Write auf data/mcp-servers.json: File-Lock gegen verlorene
+// Updates bei parallelen add/remove-Requests.
+static MCP_STORE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 fn mcp_store_path() -> std::path::PathBuf {
     std::path::PathBuf::from("data/mcp-servers.json")
 }
@@ -909,6 +913,7 @@ async fn mcp_add_server(State(state): State<AppState>, Json(body): Json<McpAddBo
     if let Err(e) = state.mcp.register(&body.name, &cfg) {
         return Json(json!({ "error": format!("Start fehlgeschlagen: {e}") }));
     }
+    let _lock = MCP_STORE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut store = mcp_store_load();
     store.insert(body.name.clone(), cfg);
     if let Err(e) = mcp_store_save(&store) {
@@ -925,6 +930,7 @@ async fn mcp_add_server(State(state): State<AppState>, Json(body): Json<McpAddBo
 }
 
 async fn mcp_remove_server(State(state): State<AppState>, Path(name): Path<String>) -> Json<serde_json::Value> {
+    let _lock = MCP_STORE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut store = mcp_store_load();
     store.remove(&name);
     if let Err(e) = mcp_store_save(&store) {

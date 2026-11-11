@@ -16,16 +16,24 @@ export default function Sessions() {
 
   const openSession = async (id: string) => {
     setActiveId(id);
-    const r = await api.getSession(id);
-    setMessages(r.messages ?? []);
+    try {
+      const r = await api.getSession(id);
+      setMessages(r.messages ?? []);
+    } catch (e) {
+      setMessages([{ role: "error", content: `Fehler: ${e}` }]);
+    }
   };
 
   const create = async () => {
     if (!name) return;
-    const s = await api.createSession(name);
-    setName("");
-    load();
-    openSession(s.id);
+    try {
+      const s = await api.createSession(name);
+      setName("");
+      load();
+      openSession(s.id);
+    } catch (e) {
+      setMessages([{ role: "error", content: `Fehler: ${e}` }]);
+    }
   };
 
   const send = async () => {
@@ -50,7 +58,11 @@ export default function Sessions() {
   };
 
   const remove = async (id: string) => {
-    await api.deleteSession(id);
+    try {
+      await api.deleteSession(id);
+    } catch (e) {
+      setMessages([{ role: "error", content: `Fehler: ${e}` }]);
+    }
     if (activeId === id) {
       setActiveId(null);
       setMessages([]);

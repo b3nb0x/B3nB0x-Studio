@@ -257,7 +257,12 @@ fn parse_decision(content: &str) -> Option<AgentDecision> {
     let end = content.rfind('}')?;
     let value: serde_json::Value = serde_json::from_str(&content[start..=end]).ok()?;
     if let Some(answer) = value["final"].as_str() {
-        return Some(AgentDecision::Final(answer.to_string()));
+        // Leere final-Antwort ist keine Entscheidung — None laesst den Loop
+        // nudgen (max_iterations begrenzt), statt "" als Erfolg zu werten.
+        if !answer.trim().is_empty() {
+            return Some(AgentDecision::Final(answer.to_string()));
+        }
+        return None;
     }
     let tool = value["tool"].as_str()?.to_string();
     Some(AgentDecision::Tool {

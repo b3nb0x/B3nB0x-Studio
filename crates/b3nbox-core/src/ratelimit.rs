@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RateLimitConfig {
@@ -45,6 +45,7 @@ pub struct RateLimitStatus {
 struct Bucket {
     tokens: f64,
     last_refill: Instant,
+    last_seen: Instant,
 }
 
 impl Bucket {
@@ -52,6 +53,7 @@ impl Bucket {
         Self {
             tokens: capacity,
             last_refill: Instant::now(),
+            last_seen: Instant::now(),
         }
     }
 
@@ -120,7 +122,13 @@ impl RateLimiter {
             return Ok(());
         }
         let mut buckets = self.buckets.lock().unwrap();
-        let bucket = buckets.entry(client.to_string()).or_insert_with(|| Bucket::new(capacity as f64));
+        if buckets.len() > 10_000 {
+            buckets.retain(|_, b| b.last_seen.elapsed() < Duration::from_secs(600));
+        }
+        let bucket = buckets
+            .entry(client.to_string())
+            .or_insert_with(|| Bucket::new(capacity as f64));
+        bucket.last_seen = Instant::now();
         if bucket.take(capacity as f64) {
             Ok(())
         } else {

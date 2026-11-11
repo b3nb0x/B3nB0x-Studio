@@ -93,7 +93,7 @@ impl ScriptRunner {
         })
     }
 
-    pub async fn run(&self, name: &str, approval: bool) -> Result<ScriptResult, String> {
+    pub async fn run(&self, name: &str, approval: bool, run_args: &[String]) -> Result<ScriptResult, String> {
         let spec = self
             .scripts
             .read()
@@ -114,8 +114,10 @@ impl ScriptRunner {
 
         // kill_on_drop: Bei Timeout wird das output()-Future gedroppt —
         // ohne dieses Flag laeuft der Child-Prozess als Orphan weiter.
+        // Schedule-Args, wenn gesetzt, ersetzen die Spec-Args.
+        let args: &[String] = if run_args.is_empty() { &spec.args } else { run_args };
         let run = tokio::process::Command::new(&spec.command)
-            .args(&spec.args)
+            .args(args)
             .kill_on_drop(true)
             .output();
         let output = match tokio::time::timeout(
@@ -243,7 +245,7 @@ impl Scheduler {
                 tracing::info!("Schedule '{}' wartet auf Freigabe (approval_required)", entry.name);
                 continue;
             }
-            match self.runner.run(&entry.script, true).await {
+            match self.runner.run(&entry.script, true, &entry.args).await {
                 Ok(result) => {
                     tracing::info!(
                         "Schedule '{}' ausgeführt: {} (rc={:?})",
@@ -277,7 +279,7 @@ mod tests {
             })
             .await
             .unwrap();
-        let result = runner.run("hello", false).await.unwrap();
+        let result = runner.run("hello", false, &[]).await.unwrap();
         assert_eq!(result.status, "completed");
         assert_eq!(result.stdout.trim(), "hallo-welt");
     }
@@ -341,7 +343,7 @@ mod tests {
             })
             .await
             .unwrap();
-        let result = runner.run("sleep", false).await.unwrap();
+        let result = runner.run("sleep", false, &[]).await.unwrap();
         assert_eq!(result.status, "timeout");
         // kill_on_drop: der orphan-Prozess darf nicht weiterlaufen
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
@@ -369,9 +371,9 @@ mod tests {
             })
             .await
             .unwrap();
-        let blocked = runner.run("reboot", false).await.unwrap();
+        let blocked = runner.run("reboot", false, &[]).await.unwrap();
         assert_eq!(blocked.status, "awaiting-approval");
-        let approved = runner.run("reboot", true).await.unwrap();
+        let approved = runner.run("reboot", true, &[]).await.unwrap();
         assert_eq!(approved.status, "completed");
     }
 
@@ -388,7 +390,7 @@ mod tests {
             })
             .await
             .unwrap();
-        let result = runner.run("slow", true).await.unwrap();
+        let result = runner.run("slow", true, &[]).await.unwrap();
         assert_eq!(result.status, "timeout");
         assert!(result.stderr.contains("Timeout"));
     }
